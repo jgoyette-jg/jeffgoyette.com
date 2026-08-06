@@ -1,0 +1,426 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import WorkCard from '../components/WorkCard.astro';
+import CareerTrace from '../components/CareerTrace.astro';
+import MetricWall from '../components/MetricWall.astro';
+import StackGrid from '../components/StackGrid.astro';
+import { site } from '../data/site';
+
+const entries = (await getCollection('work', ({ data }) => !data.draft)).sort(
+  (a, b) => a.data.rank - b.data.rank
+);
+
+const roles = await getCollection('roles');
+
+/**
+ * Years of production engineering, computed from the earliest role rather than
+ * typed. It increments on its own every year without anyone editing a file —
+ * which is the only reason a number like this can be trusted on a site that
+ * nobody is auditing monthly.
+ */
+const firstYear = Math.min(
+  ...roles.map((role) => Number(role.data.start.trim().split(/\s+/)[1]))
+);
+const years = new Date().getFullYear() - firstYear;
+
+/**
+ * The outcome numbers, each traceable to one named role.
+ *
+ * Deliberately *not* the figures the career trace derives below — that section
+ * counts structure (roles, industries, span), this one counts results. Two
+ * panels showing the same three numbers would be one panel.
+ */
+const outcomes = [
+  {
+    value: years,
+    label: 'years shipping production systems',
+    note: 'Federal agencies, banking, telecom, retail, AI SaaS',
+  },
+  {
+    value: 15,
+    prefix: '$',
+    suffix: 'k',
+    label: 'monthly cost removed',
+    note: 'Customer operating cost, after the AI dialing rebuild at Ytel',
+  },
+  {
+    value: 10,
+    suffix: '/s',
+    label: 'call initiations sustained',
+    note: 'Headroom to 50, against a 700ms time-to-first-audio budget',
+  },
+  {
+    value: 4,
+    label: 'compliance regimes shipped against',
+    note: 'California AB 723 and SB 942, the NAR Code of Ethics, C2PA',
+  },
+  {
+    value: 6,
+    label: 'engineers led',
+    note: "Delivery pod on the Lowe's account at Cognizant",
+  },
+];
+
+/**
+ * The hero pipeline. These are stages in a real sequence — you build before
+ * you can prove — so the connector between them carries meaning rather than
+ * decorating a list of capabilities. Each stage holds the tools it runs on.
+ */
+const pipeline = [
+  { stage: 'build', tools: 'spring · react · next.js' },
+  { stage: 'integrate', tools: 'kafka · camel · webhooks' },
+  { stage: 'ship', tools: 'aws · gcp · vercel' },
+  { stage: 'prove', tools: 'junit · wiremock · ga4' },
+];
+---
+
+<Base>
+  <section class="hero shell blueprint">
+    <h1>
+      {
+        site.headline.map((line, i) => (
+          <span class="line settle" style={`--i: ${i}`}>
+            {/* Only the closing clause takes the gradient. Across all three
+                lines it becomes decoration; on one line it marks which clause
+                carries the argument. */}
+            {i === site.headline.length - 1 ? <span class="grad-text">{line}</span> : line}
+          </span>
+        ))
+      }
+    </h1>
+
+    <p class="standfirst settle" style="--i: 3">{site.standfirst}</p>
+
+    <div class="pipeline settle" style="--i: 4">
+      <span class="wire" aria-hidden="true">
+        <i class="pulse"></i>
+      </span>
+      <ol>
+        {
+          pipeline.map(({ stage, tools }) => (
+            <li>
+              <span class="node" aria-hidden="true" />
+              <span class="stage mono">{stage}</span>
+              <span class="tools mono">{tools}</span>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+
+    <div class="actions settle" style="--i: 5">
+      <a class="cta" href="/resume">
+        <span>Read the résumé</span>
+        <span class="arrow" aria-hidden="true">&rarr;</span>
+      </a>
+      <a class="plain mono" href={`mailto:${site.email}`}>{site.email}</a>
+    </div>
+  </section>
+
+  <section class="band shell">
+    <header class="section-head">
+      <h2 class="eyebrow">By the numbers</h2>
+      <p class="mono note">Each figure belongs to one named role</p>
+    </header>
+    <MetricWall stats={outcomes} />
+  </section>
+
+  <section class="band shell">
+    <CareerTrace roles={roles} />
+  </section>
+
+  <section class="work shell" id="work">
+    <header class="section-head">
+      <h2 class="eyebrow">Selected work</h2>
+      <p class="mono note">Ranked by impact, not date</p>
+    </header>
+
+    {
+      entries.length ? (
+        <ol class="grid">
+          {entries.map((entry, i) => (
+            <WorkCard
+              position={i + 1}
+              index={i}
+              feature={i === 0}
+              title={entry.data.title}
+              summary={entry.data.summary}
+              href={entry.data.href ?? `/work/${entry.id}`}
+              external={Boolean(entry.data.href)}
+              period={entry.data.period}
+              role={entry.data.role}
+              stack={entry.data.stack}
+              metric={entry.data.metric}
+            />
+          ))}
+        </ol>
+      ) : (
+        <p class="empty">
+          No published work yet. Add a markdown file to{' '}
+          <code>src/content/work/</code> and set <code>draft: false</code>.
+        </p>
+      )
+    }
+  </section>
+
+  <section class="band shell blueprint" id="stack">
+    <header class="section-head">
+      <h2 class="eyebrow">Stack</h2>
+      <p class="mono note">Filter by area, or type to find something</p>
+    </header>
+    <StackGrid />
+  </section>
+
+  <section class="contact shell">
+    <p class="eyebrow">Contact</p>
+    <p class="pitch">
+      Hiring, building something with a model in the middle of it, or holding a
+      system that works but can&rsquo;t prove it?{' '}
+      <a href={`mailto:${site.email}`}>Tell me what it does.</a>
+    </p>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    padding-block: clamp(3.5rem, 11vh, 8rem) var(--space-xl);
+  }
+
+  h1 {
+    font-size: var(--step-4);
+    font-weight: 600;
+    line-height: 0.94;
+    letter-spacing: -0.04em;
+  }
+
+  .line {
+    display: block;
+  }
+
+  .standfirst {
+    max-width: 36rem;
+    margin-block-start: clamp(1.5rem, 4vw, 2.25rem);
+    font-size: var(--step-1);
+    font-weight: 300;
+    line-height: 1.45;
+  }
+
+  /* ---- hero pipeline ---- */
+
+  .pipeline {
+    position: relative;
+    margin-block-start: clamp(2.25rem, 5vw, 3.25rem);
+    max-inline-size: 46rem;
+  }
+
+  .pipeline ol {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.35rem var(--space-md);
+    list-style: none;
+    margin: 0;
+  }
+
+  .pipeline li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    transition: transform 0.2s ease;
+  }
+
+  .pipeline li:hover {
+    transform: translateY(-2px);
+  }
+
+  .node {
+    inline-size: 9px;
+    block-size: 9px;
+    margin-block-end: 0.35rem;
+    border-radius: 50%;
+    background: var(--grad-signal);
+    /* The paper-coloured ring punches the node out of the wire behind it, so
+       the wire reads as passing between the stages rather than under them. */
+    box-shadow:
+      0 0 0 3px var(--paper),
+      0 0 14px -2px var(--signal);
+    transition: box-shadow 0.2s ease;
+  }
+
+  .pipeline li:hover .node {
+    box-shadow:
+      0 0 0 3px var(--paper),
+      0 0 22px 0 var(--signal);
+  }
+
+  .stage {
+    font-size: var(--step--1);
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+
+  .tools {
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  /* The wire only exists once the stages sit on one row — drawn across four
+     columns it reads as flow, stacked in two it would just be a stray line. */
+  .wire {
+    display: none;
+  }
+
+  @media (min-width: 46rem) {
+    .pipeline ol {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .wire {
+      display: block;
+      position: absolute;
+      inset-block-start: 4px;
+      inset-inline: 4px 25%;
+      block-size: 1px;
+      background: var(--grad-edge);
+    }
+
+    .pulse {
+      position: absolute;
+      inset-block-start: -2px;
+      inline-size: 6px;
+      block-size: 6px;
+      margin-inline-start: -3px;
+      border-radius: 50%;
+      background: var(--signal);
+      box-shadow: 0 0 10px 1px var(--signal);
+      animation: travel 4.5s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pulse {
+      display: none;
+    }
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-md);
+    margin-block-start: clamp(2.25rem, 5vw, 3rem);
+  }
+
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--grad-cta);
+    color: var(--on-cta);
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    padding: 0.85rem 1.4rem;
+    border-radius: 4px;
+    box-shadow: var(--glow-soft);
+    /* The gradient is drawn wider than the button, so shifting its position
+       slides the colour across on hover. Two backgrounds cannot cross-fade —
+       `background-image` is not an animatable property — but a position can. */
+    background-size: 190% 100%;
+    background-position: 0% 50%;
+    transition:
+      background-position 0.45s ease,
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .cta:hover {
+    background-position: 100% 50%;
+    box-shadow: var(--glow-lift);
+    transform: translateY(-2px);
+  }
+
+  .arrow {
+    transition: transform 0.2s ease;
+  }
+
+  .cta:hover .arrow {
+    transform: translateX(3px);
+  }
+
+  .plain {
+    color: var(--muted);
+    text-decoration-color: var(--rule-strong);
+  }
+
+  .plain:hover {
+    color: var(--signal);
+  }
+
+  /* ---- sections ---- */
+
+  .band {
+    padding-block-end: var(--space-xl);
+  }
+
+  .section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding-block-end: var(--space-md);
+  }
+
+  @media (min-width: 34rem) {
+    .section-head {
+      flex-direction: row;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-md);
+    }
+  }
+
+  .note {
+    color: var(--muted);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+    list-style: none;
+    margin: 0;
+  }
+
+  @media (min-width: 52rem) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .empty {
+    color: var(--muted);
+    padding-block: var(--space-lg);
+    border-block: 1px solid var(--rule);
+  }
+
+  .empty code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  .contact {
+    padding-block-start: var(--space-xl);
+  }
+
+  .pitch {
+    max-width: 30rem;
+    margin-block-start: var(--space-sm);
+    font-size: var(--step-2);
+    font-weight: 300;
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+  }
+</style>

@@ -1,0 +1,158 @@
+---
+import { Font } from 'astro:assets';
+import { site, profiles } from '../data/site';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import AuroraField from '../components/AuroraField.astro';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Set on interior pages so the header shows a back affordance. */
+  interior?: boolean;
+  /**
+   * Strength of the aurora field, 0–1. Interior pages carry long-form body
+   * copy, so they get a much weaker field — colour behind paragraphs costs
+   * contrast, and contrast is not negotiable on the pages people read.
+   */
+  glow?: number;
+}
+
+const {
+  title,
+  description = site.description,
+  interior = false,
+  glow = interior ? 0.4 : 1,
+} = Astro.props;
+
+const pageTitle = title ? `${title} — ${site.name}` : `${site.name} — ${site.role}`;
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+
+const [locality, region] = site.location.split(',').map((part) => part.trim());
+
+/**
+ * `alternateName` carries the résumé spelling ("Jeffrey"), and `sameAs` points
+ * at the verified LinkedIn URL. Together they let a search engine resolve the
+ * two names to one entity — without both, this site and the LinkedIn profile
+ * can be read as different people.
+ */
+const personSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: site.name,
+  alternateName: site.fullName,
+  url: site.url,
+  email: `mailto:${site.email}`,
+  jobTitle: site.role,
+  description: site.description,
+  worksFor: { '@type': 'Organization', name: 'Reel Estate' },
+  alumniOf: {
+    '@type': 'CollegeOrUniversity',
+    name: 'University of North Carolina at Charlotte',
+  },
+  ...(locality
+    ? {
+        address: {
+          '@type': 'PostalAddress',
+          addressLocality: locality,
+          ...(region ? { addressRegion: region } : {}),
+          addressCountry: 'US',
+        },
+      }
+    : {}),
+  ...(profiles.length ? { sameAs: profiles.map((p) => p.href) } : {}),
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href={canonical} />
+
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={site.domain} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <Font cssVariable="--font-display" preload />
+    <Font cssVariable="--font-body" preload />
+    <Font cssVariable="--font-mono" />
+
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify(personSchema)}
+    />
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="scroll-progress" aria-hidden="true"></div>
+    <AuroraField intensity={glow} />
+    <SiteHeader interior={interior} />
+    <main id="main">
+      <slot />
+    </main>
+    <SiteFooter />
+
+    <script>
+      /**
+       * Pointer tracking for every `.spotlight` surface on the page.
+       *
+       * One delegated listener on the document rather than one per card. With
+       * a dozen work cards and a dozen skill cards that is the difference
+       * between 24 listeners competing for the same event and 1.
+       *
+       * The write is coalesced into a rAF tick for the same reason as the
+       * aurora parallax: `pointermove` outpaces the frame rate, and each write
+       * to `--mx` invalidates paint on the highlight.
+       */
+      if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        let pending: { el: HTMLElement; x: number; y: number } | null = null;
+        let queued = false;
+
+        const flush = () => {
+          queued = false;
+          if (!pending) return;
+          const { el, x, y } = pending;
+          el.style.setProperty('--mx', x.toFixed(4));
+          el.style.setProperty('--my', y.toFixed(4));
+          pending = null;
+        };
+
+        document.addEventListener(
+          'pointermove',
+          (event) => {
+            const target = event.target as Element | null;
+            const surface = target?.closest?.('.spotlight') as HTMLElement | null;
+            if (!surface) return;
+
+            // getBoundingClientRect is a layout read. It is only reached when
+            // the pointer is actually over a spotlight surface, and at most
+            // once per frame after coalescing.
+            const box = surface.getBoundingClientRect();
+            pending = {
+              el: surface,
+              x: (event.clientX - box.left) / box.width,
+              y: (event.clientY - box.top) / box.height,
+            };
+
+            if (!queued) {
+              queued = true;
+              requestAnimationFrame(flush);
+            }
+          },
+          { passive: true }
+        );
+      }
+    </script>
+  </body>
+</html>

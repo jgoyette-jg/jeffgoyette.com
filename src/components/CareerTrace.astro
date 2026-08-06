@@ -1,0 +1,655 @@
+---
+/**
+ * The career as a distributed trace.
+ *
+ * Every span is positioned and sized from its real start and end dates, so bar
+ * width is duration — not a layout convenience. Two consequences that are the
+ * whole reason this exists rather than a styled list:
+ *
+ *   1. Concurrent roles overlap, visibly. The trace cannot flatten a career
+ *      into a tidy sequence, because the underlying data isn't one.
+ *   2. Gaps are gaps. The break between roles is drawn at its true width.
+ *
+ * Colour encodes industry (see `domain` in content.config.ts). Open spans —
+ * roles with no end date — stay unterminated and carry a live pulse.
+ */
+
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  roles: CollectionEntry<'roles'>[];
+  /** Interior pages already have a heading above this; skip the duplicate. */
+  bare?: boolean;
+}
+
+const { roles, bare = false } = Astro.props;
+
+const MONTHS: Record<string, number> = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+};
+
+/** 'Dec 2022' → 2022.917. Fractional years keep month precision in the plot. */
+function toYear(value: string): number {
+  const [month, year] = value.trim().split(/\s+/);
+  return Number(year) + (MONTHS[month] ?? 0) / 12;
+}
+
+const now = new Date();
+const today = now.getFullYear() + now.getMonth() / 12;
+
+const spans = roles
+  .map((role) => {
+    const from = toYear(role.data.start);
+    const to = role.data.end ? toYear(role.data.end) : today;
+    return { ...role.data, from, to, open: !role.data.end };
+  })
+  .sort((a, b) => a.from - b.from);
+
+// Axis bounds snap to whole years so the gridlines land on labelled ticks.
+const min = Math.floor(Math.min(...spans.map((s) => s.from)));
+const max = Math.ceil(Math.max(...spans.map((s) => s.to)));
+const range = max - min;
+
+const pct = (value: number) => ((value - min) / range) * 100;
+
+const years = Array.from({ length: range + 1 }, (_, i) => min + i);
+
+const DOMAINS = [
+  { key: 'ai', label: 'AI' },
+  { key: 'telecom', label: 'Telecom' },
+  { key: 'finance', label: 'Banking' },
+  { key: 'commerce', label: 'Commerce' },
+  { key: 'public', label: 'Public / teaching' },
+] as const;
+
+/** Only label the domains actually present, so the legend never over-promises. */
+const used = new Set(spans.map((s) => s.domain));
+const legend = DOMAINS.filter((d) => used.has(d.key));
+
+/**
+ * Derived from the collection, never typed by hand — add or edit a role and
+ * these move with it. That's the point: they cannot go stale or overstate.
+ */
+const stats = [
+  {
+    // Measured from the real first start date, not the floored axis bound,
+    // and floored — this number must never round up into a claim.
+    value: String(
+      Math.floor(
+        Math.max(...spans.map((s) => s.to)) - Math.min(...spans.map((s) => s.from))
+      )
+    ),
+    label: 'years, first role to now',
+  },
+  { value: String(spans.length), label: 'roles' },
+  { value: String(used.size), label: 'industries' },
+];
+
+const duration = (s: (typeof spans)[number]) => {
+  const months = Math.round((s.to - s.from) * 12);
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  return [y ? `${y}y` : '', m ? `${m}mo` : ''].filter(Boolean).join(' ') || '<1mo';
+};
+---
+
+<career-trace class="trace" style={`--rows: ${spans.length}`}>
+  {
+    !bare && (
+      <header class="head">
+        <h2 class="eyebrow">Career trace</h2>
+        <p class="mono note">Bar width is duration · colour is domain · click a bar to pin it</p>
+      </header>
+    )
+  }
+
+  <dl class="stats">
+    {
+      stats.map((s) => (
+        <div>
+          <dt class="value grad-text">{s.value}</dt>
+          <dd class="mono">{s.label}</dd>
+        </div>
+      ))
+    }
+  </dl>
+
+  {/* The legend doubles as the filter. Making it interactive rather than
+      adding a second row of controls keeps the colour key and the thing it
+      keys to in one place — and a static legend was already occupying the
+      space. `aria-pressed` carries the state; there is no parallel class. */}
+  <ul class="legend mono" role="group" aria-label="Filter career spans by domain">
+    <li>
+      <button type="button" class="key" data-domain="all" aria-pressed="true">
+        <span class="swatch all" aria-hidden="true"></span>
+        All
+      </button>
+    </li>
+    {
+      legend.map((d) => (
+        <li>
+          <button type="button" class="key" data-domain={d.key} aria-pressed="false">
+            <span class="swatch" data-domain={d.key} aria-hidden="true" />
+            {d.label}
+          </button>
+        </li>
+      ))
+    }
+  </ul>
+
+  <div class="plot">
+    <div class="axis mono" aria-hidden="true">
+      {
+        years.map((year) => (
+          <span
+            class="tick"
+            data-label={(year - min) % 2 === 0 ? 'on' : 'off'}
+            style={`--x: ${pct(year)}%`}
+          >
+            <i>{String(year).slice(2)}</i>
+          </span>
+        ))
+      }
+    </div>
+
+    <ol class="rows">
+      {
+        spans.map((s, i) => (
+          <li class="row" data-domain={s.domain} style={`--i: ${i}`}>
+            <span class="co mono">{s.company}</span>
+
+            <span class="track">
+              {/* A button, not a tabindex on the li. Pinning is a real action,
+                  so it needs to be reachable and operable by keyboard with
+                  Enter and Space for free rather than re-implemented. */}
+              <button
+                type="button"
+                class:list={['span', { open: s.open }]}
+                data-domain={s.domain}
+                aria-pressed="false"
+                style={`--x: ${pct(s.from)}%; --w: ${pct(s.to) - pct(s.from)}%`}
+              >
+                <span class="sr">
+                  {s.company} — {s.title}, {s.start} to {s.end ?? 'present'}
+                </span>
+              </button>
+            </span>
+
+            {/* The company is repeated here even though `.co` already shows it
+                on wide screens, because `.co` is hidden below 40rem — on a
+                phone this readout is the only thing that names the bar. */}
+            <span class="det mono">
+              <strong>{s.company}</strong>
+              <span class="det-title">{s.title}</span>
+              {s.note ? <em>{s.note}</em> : null}
+              <span>
+                {s.start} &ndash; {s.end ?? 'Present'} · {duration(s)}
+              </span>
+            </span>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</career-trace>
+
+<script>
+  class CareerTrace extends HTMLElement {
+    connectedCallback() {
+      const keys = [...this.querySelectorAll<HTMLButtonElement>('.key')];
+      const rows = [...this.querySelectorAll<HTMLElement>('.row')];
+      const bars = [...this.querySelectorAll<HTMLButtonElement>('.span')];
+
+      // ---- domain filter ----
+      // Dimming rather than hiding. A trace whose rows disappear loses the very
+      // thing it exists to show: where the spans sit relative to each other in
+      // time. Filtered-out rows stay in place at low opacity.
+      for (const key of keys) {
+        key.addEventListener('click', () => {
+          const want = key.dataset.domain ?? 'all';
+          for (const row of rows) {
+            row.classList.toggle('dim', want !== 'all' && row.dataset.domain !== want);
+          }
+          for (const other of keys) {
+            other.setAttribute('aria-pressed', String(other === key));
+          }
+        });
+      }
+
+      // ---- click to pin ----
+      // On a touch device there is no hover, so the readout would be
+      // unreachable without this. Pinning is the primary interaction there and
+      // a convenience on the desktop.
+      for (const bar of bars) {
+        bar.addEventListener('click', () => {
+          const wasPinned = bar.getAttribute('aria-pressed') === 'true';
+          for (const other of bars) other.setAttribute('aria-pressed', 'false');
+          for (const row of rows) row.classList.remove('pinned');
+          if (wasPinned) return; // second click on the same bar unpins
+          bar.setAttribute('aria-pressed', 'true');
+          bar.closest('.row')?.classList.add('pinned');
+        });
+      }
+
+      // Escape clears the pin. Anything that stays on screen after you stop
+      // interacting with it needs a way out that isn't "find the bar again".
+      this.addEventListener('keydown', (event) => {
+        if ((event as KeyboardEvent).key !== 'Escape') return;
+        for (const other of bars) other.setAttribute('aria-pressed', 'false');
+        for (const row of rows) row.classList.remove('pinned');
+      });
+    }
+  }
+
+  customElements.define('career-trace', CareerTrace);
+</script>
+
+<style>
+  /* A custom element is `display: inline` until told otherwise, which would
+     collapse the whole plot. This is the first line that has to exist. */
+  .trace {
+    display: block;
+    /* Both the axis layer and the row tracks index off this, so the gridlines
+       stay locked to the bars at every breakpoint. Change it in one place. */
+    --label: 0rem;
+    --row-h: 1.55rem;
+  }
+
+  /* Visually hidden but present for screen readers and for the accessible name
+     of each span button. `clip-path` rather than `display: none`, which would
+     remove it from the accessibility tree along with the layout. */
+  .sr {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding-block-end: var(--space-sm);
+  }
+
+  .note {
+    color: var(--muted);
+  }
+
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md) clamp(1.75rem, 5vw, 3.5rem);
+    margin: 0 0 var(--space-md);
+    padding-block-end: var(--space-md);
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .stats .value {
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    /* Violet, not green: these are counts, not gains. */
+    color: var(--signal);
+  }
+
+  .stats dd {
+    margin: 0.3rem 0 0;
+    max-inline-size: 12ch;
+    font-size: var(--step--1);
+    line-height: 1.3;
+    color: var(--muted);
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    list-style: none;
+    margin: 0 0 var(--space-md);
+    color: var(--muted);
+  }
+
+  .key {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.6rem;
+    font: inherit;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    cursor: pointer;
+    transition:
+      color 0.16s ease,
+      background 0.16s ease,
+      border-color 0.16s ease;
+  }
+
+  .key:hover {
+    color: var(--ink);
+    border-color: var(--rule);
+  }
+
+  .key[aria-pressed='true'] {
+    color: var(--ink);
+    background: var(--signal-wash);
+    border-color: color-mix(in oklch, var(--signal) 30%, transparent);
+  }
+
+  .swatch {
+    inline-size: 0.7rem;
+    block-size: 0.7rem;
+    /* The ramp, not the flat colour — so the swatch is an honest sample of what
+       the span it keys to actually looks like. */
+    background: linear-gradient(120deg in oklch, var(--c), var(--c2, var(--c)));
+    border-radius: 2px;
+  }
+
+  .swatch.all {
+    background: var(--grad-spectrum);
+  }
+
+  .plot {
+    position: relative;
+  }
+
+  /* ---- time axis ---- */
+
+  .axis {
+    position: relative;
+    block-size: 1.35rem;
+    margin-inline-start: var(--label);
+    color: var(--muted);
+  }
+
+  .tick {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: var(--x);
+    border-inline-start: 1px solid var(--rule);
+  }
+
+  /* The rule continues down through every row. Drawing it from the tick keeps
+     one element per year instead of one per year per row. */
+  .tick::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline-start: -1px;
+    inline-size: 1px;
+    /* Exactly the rows that exist — --rows comes from the data, so adding a
+       role extends the gridlines without touching this file. */
+    block-size: calc(var(--row-h) * var(--rows, 10));
+    background: var(--rule);
+  }
+
+  .tick i {
+    position: absolute;
+    inset-block-end: 0.15rem;
+    inset-inline-start: 0.3rem;
+    font-size: 0.68rem;
+    font-style: normal;
+    letter-spacing: 0.06em;
+  }
+
+  .tick[data-label='off'] i {
+    display: none;
+  }
+
+  /* ---- rows ---- */
+
+  .rows {
+    position: relative;
+    list-style: none;
+    margin: 0;
+  }
+
+  .row {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--label) 1fr;
+    align-items: center;
+    block-size: var(--row-h);
+    transition:
+      background 0.15s ease,
+      opacity 0.25s ease;
+  }
+
+  .row:hover,
+  .row:focus-within,
+  .row.pinned {
+    background: var(--signal-wash);
+  }
+
+  /* Filtered out, not removed. The row keeps its position on the time axis so
+     the shape of the career stays legible while a domain is isolated. */
+  .row.dim {
+    opacity: 0.24;
+  }
+
+  .row.dim:hover {
+    opacity: 0.55;
+  }
+
+  /* Explicit placement, not auto — and this is what makes `display: none`
+     below safe. Auto-placement would slide `.track` into the label column the
+     moment `.co` stopped being a grid item, collapsing every span to nothing.
+     With both columns pinned, the layout no longer depends on what's visible.
+
+     Hidden rather than clipped at narrow widths: the label column is 0 wide
+     below 40rem, and a 0-width box with `overflow: hidden` still rendered a
+     two-character stub over the plot. There is nothing useful to show in zero
+     pixels, so the row is named by the tap readout instead. */
+  .co {
+    display: none;
+    grid-column: 1;
+    padding-inline-end: 0.6rem;
+    font-size: 0.66rem;
+    color: var(--muted);
+    text-align: end;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .row:hover .co,
+  .row:focus-visible .co {
+    color: var(--ink);
+  }
+
+  .track {
+    grid-column: 2;
+    position: relative;
+    block-size: 100%;
+  }
+
+  .span {
+    position: absolute;
+    inset-block: 0.28rem;
+    inset-inline-start: var(--x);
+    inline-size: var(--w);
+    min-inline-size: 3px;
+    padding: 0;
+    appearance: none;
+    /* The ramp runs left-to-right, which is also the direction of time on this
+       axis — so a long span visibly lightens as it approaches the present. */
+    background: linear-gradient(90deg in oklch, var(--c), var(--c2, var(--c)));
+    border: 0;
+    border-radius: 2px;
+    cursor: pointer;
+    transform-origin: left center;
+    animation: draw-span 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+    animation-delay: calc(var(--i) * 55ms);
+    transition:
+      filter 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .span:hover,
+  .span:focus-visible,
+  .span[aria-pressed='true'] {
+    filter: saturate(1.35) brightness(1.08);
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--c) 55%, transparent),
+      0 0 14px -2px var(--c);
+  }
+
+  /* An open span has no right edge to draw, so it fades out and carries a
+     live pulse — the trace hasn't closed. */
+  .span.open {
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+    mask-image: linear-gradient(to right, #000 82%, rgba(0, 0, 0, 0.35));
+  }
+
+  .span.open::after {
+    content: '';
+    position: absolute;
+    inset-inline-end: -1px;
+    inset-block-start: 50%;
+    inline-size: 5px;
+    block-size: 5px;
+    margin-block-start: -2.5px;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 0 0 0 var(--c);
+    animation: ping 2.4s ease-out infinite;
+  }
+
+  @keyframes ping {
+    0% {
+      box-shadow: 0 0 0 0 var(--c);
+      opacity: 1;
+    }
+    70%,
+    100% {
+      box-shadow: 0 0 0 7px transparent;
+      opacity: 0.85;
+    }
+  }
+
+  /* ---- detail readout ---- */
+
+  .det {
+    grid-column: 2;
+    justify-self: start;
+    position: absolute;
+    inset-inline-start: var(--label);
+    inset-block-start: calc(100% - 0.1rem);
+    z-index: 3;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.1rem 0.55rem;
+    padding: 0.4rem 0.65rem;
+    background: var(--grad-surface);
+    border: 1px solid color-mix(in oklch, var(--c) 40%, var(--rule-strong));
+    border-radius: 4px;
+    box-shadow: var(--glow-lift);
+    font-size: 0.7rem;
+    color: var(--muted);
+    max-inline-size: min(30rem, calc(100% - var(--label)));
+    opacity: 0;
+    transform: translateY(-0.25rem);
+    pointer-events: none;
+    transition:
+      opacity 0.14s ease,
+      transform 0.14s ease;
+  }
+
+  .det strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .det-title {
+    color: var(--ink);
+  }
+
+  .det em {
+    font-style: normal;
+    color: color-mix(in oklch, var(--c) 70%, var(--ink));
+  }
+
+  .row:hover .det,
+  .row:focus-within .det,
+  .row.pinned .det {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Last two rows would push their readout past the section edge. */
+  .row:nth-last-child(-n + 2) .det {
+    inset-block-start: auto;
+    inset-block-end: calc(100% - 0.1rem);
+    transform: translateY(0.25rem);
+  }
+
+  .row:nth-last-child(-n + 2):hover .det,
+  .row:nth-last-child(-n + 2):focus-within .det,
+  .row:nth-last-child(-n + 2).pinned .det {
+    transform: none;
+  }
+
+  /* ---- domain colours ----
+     Each pair feeds both the flat `--c` uses (dots, glows, borders) and the
+     two-stop ramp on the spans and swatches. */
+
+  [data-domain='ai'] {
+    --c: var(--dom-ai);
+    --c2: var(--dom-ai-2);
+  }
+  [data-domain='telecom'] {
+    --c: var(--dom-telecom);
+    --c2: var(--dom-telecom-2);
+  }
+  [data-domain='finance'] {
+    --c: var(--dom-finance);
+    --c2: var(--dom-finance-2);
+  }
+  [data-domain='commerce'] {
+    --c: var(--dom-commerce);
+    --c2: var(--dom-commerce-2);
+  }
+  [data-domain='public'] {
+    --c: var(--dom-public);
+    --c2: var(--dom-public-2);
+  }
+
+  @media (min-width: 40rem) {
+    .trace {
+      --label: 7.5rem;
+      --row-h: 1.75rem;
+    }
+
+    .co {
+      display: block;
+    }
+  }
+
+  @media (min-width: 60rem) {
+    .trace {
+      --label: 9.5rem;
+    }
+
+    .co {
+      font-size: 0.76rem;
+    }
+  }
+
+  /* The pulse and the draw are atmosphere, not information — the bars are
+     already positioned correctly without them. */
+  @media (prefers-reduced-motion: reduce) {
+    .span,
+    .span.open::after {
+      animation: none;
+    }
+  }
+</style>

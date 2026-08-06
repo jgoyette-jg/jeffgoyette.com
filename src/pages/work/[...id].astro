@@ -1,0 +1,191 @@
+---
+import type { GetStaticPaths } from 'astro';
+import { getCollection, render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+
+export const getStaticPaths = (async () => {
+  const entries = await getCollection('work', ({ data }) => !data.draft);
+  return entries
+    .filter((entry) => !entry.data.href) // externally-linked work has no local page
+    .map((entry) => ({ params: { id: entry.id }, props: { entry } }));
+}) satisfies GetStaticPaths;
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const { title, summary, period, role, stack, metric } = entry.data;
+---
+
+<Base title={title} description={summary} interior>
+  <article class="shell">
+    <header class="blueprint">
+      <p class="eyebrow">Work</p>
+      <h1><span class="grad-text">{title}</span></h1>
+      <p class="summary">{summary}</p>
+
+      <dl class="facts">
+        <div>
+          <dt class="mono">Period</dt>
+          <dd class="mono">{period}</dd>
+        </div>
+        {
+          role ? (
+            <div>
+              <dt class="mono">Role</dt>
+              <dd class="mono">{role}</dd>
+            </div>
+          ) : null
+        }
+        {
+          stack.length ? (
+            <div>
+              <dt class="mono">Stack</dt>
+              <dd class="mono">{stack.join(' · ')}</dd>
+            </div>
+          ) : null
+        }
+        {
+          metric ? (
+            <div>
+              <dt class="mono">Result</dt>
+              <dd class="mono result" data-positive={metric.positive}>
+                {metric.value} {metric.label}
+              </dd>
+            </div>
+          ) : null
+        }
+      </dl>
+    </header>
+
+    <div class="body prose">
+      <Content />
+    </div>
+
+    <p class="back mono"><a href="/#work">&larr; All work</a></p>
+  </article>
+</Base>
+
+<style>
+  article {
+    padding-block: clamp(3rem, 8vw, 5rem) 0;
+  }
+
+  h1 {
+    margin-block-start: var(--space-sm);
+    font-size: var(--step-3);
+  }
+
+  .summary {
+    max-width: 38rem;
+    margin-block-start: var(--space-md);
+    font-size: var(--step-1);
+    font-weight: 300;
+    line-height: 1.45;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md) var(--space-lg);
+    margin-block: var(--space-lg) 0;
+    padding: var(--space-md) var(--space-md);
+    background: var(--grad-surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    box-shadow: var(--glow-soft);
+  }
+
+  dt {
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: var(--step--1);
+  }
+
+  dd {
+    margin: 0.35rem 0 0;
+  }
+
+  .result {
+    color: var(--signal);
+    font-weight: 500;
+  }
+
+  /* Green stays flat, as everywhere else on the site: it is a claim about
+     direction, and a violet-to-cyan ramp would erase that. */
+  .result[data-positive='true'] {
+    color: var(--gain);
+  }
+
+  .body {
+    padding-block-start: var(--space-lg);
+  }
+
+  /* Markdown output is not scoped, so reach it through the wrapper. */
+  .body :global(h2) {
+    font-size: var(--step-2);
+    margin-block: var(--space-lg) var(--space-sm);
+  }
+
+  .body :global(h3) {
+    font-size: var(--step-1);
+    margin-block: var(--space-md) var(--space-xs);
+  }
+
+  .body :global(p),
+  .body :global(ul),
+  .body :global(ol) {
+    margin-block-end: var(--space-md);
+  }
+
+  .body :global(ul),
+  .body :global(ol) {
+    padding-inline-start: 1.25rem;
+  }
+
+  .body :global(li) {
+    margin-block-end: 0.35rem;
+  }
+
+  .body :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--signal-wash);
+    padding: 0.1em 0.35em;
+  }
+
+  .body :global(pre) {
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    background: var(--card);
+    border: 1px solid var(--rule);
+    padding: var(--space-md);
+    overflow-x: auto;
+    margin-block-end: var(--space-md);
+  }
+
+  .body :global(pre code) {
+    background: none;
+    padding: 0;
+  }
+
+  .body :global(blockquote) {
+    border-inline-start: 2px solid var(--signal);
+    padding-inline-start: var(--space-md);
+    margin-block-end: var(--space-md);
+    color: var(--muted);
+  }
+
+  .back {
+    padding-block-start: var(--space-lg);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .back a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+
+  .back a:hover {
+    color: var(--signal);
+  }
+</style>

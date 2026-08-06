@@ -1,0 +1,771 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import CareerTrace from '../components/CareerTrace.astro';
+import TechLedger from '../components/TechLedger.astro';
+import StackGrid from '../components/StackGrid.astro';
+import { site, education, certifications, lenses } from '../data/site';
+
+const roles = (await getCollection('roles')).sort(
+  (a, b) => b.data.order - a.data.order
+);
+
+/**
+ * Drop a PDF at public/resume.pdf to turn on the download button. Nothing
+ * breaks if it isn't there — the button just doesn't render.
+ */
+const pdf = '/resume.pdf';
+const hasPdf = false; // flip to true once public/resume.pdf exists
+
+/** Sticky in-page nav. Kept next to the sections it points at, so a new block
+ *  cannot be added without the nav noticing. */
+const sections = [
+  { id: 'trace', label: 'Trace' },
+  { id: 'history', label: 'History' },
+  { id: 'ledger', label: 'Ledger' },
+  { id: 'skills', label: 'Skills' },
+  { id: 'credentials', label: 'Credentials' },
+];
+---
+
+<Base
+  title="Résumé"
+  description={`Résumé for ${site.name} — ${site.role}.`}
+  interior
+>
+  <div class="shell">
+    <header class="head blueprint">
+      <p class="eyebrow">Résumé</p>
+      <h1><span class="grad-text">{site.name}</span></h1>
+      <p class="line">{site.description}</p>
+
+      <div class="actions">
+        <a class="cta" href={`mailto:${site.email}`}>
+          <span>{site.email}</span>
+          <span class="arrow" aria-hidden="true">&rarr;</span>
+        </a>
+        {
+          hasPdf ? (
+            <a class="plain mono" href={pdf} download>
+              Download PDF
+            </a>
+          ) : null
+        }
+      </div>
+    </header>
+
+    <nav class="jump" aria-label="Sections">
+      <ul>
+        {
+          sections.map((section) => (
+            <li>
+              <a class="mono" href={`#${section.id}`}>
+                {section.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    {roles.length ? (
+      <section class="block" id="trace">
+        <h2 class="eyebrow">Career trace</h2>
+        <p class="mono note">
+          Bar width is duration · colour is domain · click a bar to pin it
+        </p>
+        <div class="plot-wrap">
+          <CareerTrace roles={roles} bare />
+        </div>
+      </section>
+    ) : null}
+
+    {
+      roles.length ? (
+        <section class="block" id="history">
+          <h2 class="eyebrow">History</h2>
+          <p class="mono note">Titles and dates reconciled against LinkedIn</p>
+
+          {/* The two ways this résumé is aimed, as one control rather than two
+              separate documents the reader never gets to compare. */}
+          <resume-lens>
+            <div class="lens" role="group" aria-label="Emphasise a specialism">
+              <button type="button" class="lens-btn" data-lens="all" aria-pressed="true">
+                Full history
+              </button>
+              {lenses.map((lens) => (
+                <button
+                  type="button"
+                  class="lens-btn"
+                  data-lens={lens.key}
+                  data-domains={lens.domains.join(' ')}
+                  data-blurb-text={lens.blurb}
+                  aria-pressed="false"
+                >
+                  {lens.label}
+                </button>
+              ))}
+            </div>
+
+            <p class="lens-blurb" data-blurb hidden></p>
+
+            <ol class="roles">
+              {roles.map((entry, i) => (
+                <li class="role reveal" data-domain={entry.data.domain} style={`--i: ${i}`}>
+                  <p class="dates mono">
+                    {entry.data.start} &ndash; {entry.data.end ?? 'Present'}
+                  </p>
+                  <div>
+                    <h3>{entry.data.title}</h3>
+                    <p class="org mono">
+                      {entry.data.company}
+                      {entry.data.location ? ` · ${entry.data.location}` : ''}
+                    </p>
+                    {entry.data.note ? <p class="role-note">{entry.data.note}</p> : null}
+
+                    <div class="detail">
+                      {entry.data.highlights.length ? (
+                        <ul class="highlights">
+                          {entry.data.highlights.map((h) => (
+                            <li>{h}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+
+                      {/* Native <details>. Accessible, keyboard-operable, and
+                          correct with zero script — no reason to reimplement a
+                          disclosure widget. */}
+                      {entry.data.projects.length || entry.data.stack.length ? (
+                        <details class="more">
+                          <summary class="mono">
+                            <span>Systems and stack</span>
+                            <span class="chev" aria-hidden="true">&darr;</span>
+                          </summary>
+
+                          {entry.data.projects.length ? (
+                            <ul class="projects">
+                              {entry.data.projects.map((project) => (
+                                <li>
+                                  <p class="proj-name mono">{project.name}</p>
+                                  <p class="proj-summary">{project.summary}</p>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+
+                          {entry.data.stack.length ? (
+                            <ul class="chips">
+                              {entry.data.stack.map((tech) => (
+                                <li class="mono">{tech}</li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </details>
+                      ) : null}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </resume-lens>
+        </section>
+      ) : (
+        <div class="empty">
+          <p class="mono">No roles published yet.</p>
+          <p>
+            Drop your résumé files into <code>/resumes</code> in the project
+            root and ask Claude to populate this page — each role becomes one
+            markdown file in <code>src/content/roles/</code>. See
+            <code>src/content/roles/_example.md</code> for the shape.
+          </p>
+        </div>
+      )
+    }
+
+    <section class="block" id="ledger">
+      <h2 class="eyebrow">Technology ledger</h2>
+      <p class="mono note">Derived from the role history, not typed separately</p>
+      <div class="plot-wrap">
+        <TechLedger roles={roles} />
+      </div>
+    </section>
+
+    <section class="block blueprint" id="skills">
+      <h2 class="eyebrow">Skills</h2>
+      <p class="mono note">Filter by area, or type to find something</p>
+      <div class="plot-wrap">
+        <StackGrid />
+      </div>
+    </section>
+
+    <section class="block" id="credentials">
+      <h2 class="eyebrow">Credentials</h2>
+      <dl class="pairs">
+        {
+          education.map((item) => (
+            <div class="pair">
+              <dt class="mono">Education</dt>
+              <dd>
+                {item.credential}
+                <span class="org mono">
+                  {item.institution}
+                  {item.year ? ` · ${item.year}` : ''}
+                </span>
+              </dd>
+            </div>
+          ))
+        }
+        {
+          certifications.map((item) => (
+            <div class="pair">
+              <dt class="mono">Certification</dt>
+              <dd>
+                {item.credential}
+                {item.expired ? <span class="lapsed mono">lapsed</span> : null}
+                <span class="org mono">{item.institution}</span>
+              </dd>
+            </div>
+          ))
+        }
+      </dl>
+    </section>
+  </div>
+</Base>
+
+<script>
+  /**
+   * The lens control. Non-matching roles are demoted to a single line — dates,
+   * title, company — rather than hidden.
+   *
+   * That choice is not cosmetic. On a résumé a hidden row reads as an
+   * employment gap to anyone scanning the dates, so a filter here has to change
+   * emphasis without ever changing the timeline. Collapsing the detail does
+   * that; `hidden` would not.
+   */
+  class ResumeLens extends HTMLElement {
+    connectedCallback() {
+      const buttons = [...this.querySelectorAll<HTMLButtonElement>('.lens-btn')];
+      const roles = [...this.querySelectorAll<HTMLElement>('.role')];
+      const blurb = this.querySelector<HTMLElement>('[data-blurb]');
+
+      for (const button of buttons) {
+        button.addEventListener('click', () => {
+          const key = button.dataset.lens ?? 'all';
+          const wanted = (button.dataset.domains ?? '').split(' ').filter(Boolean);
+
+          for (const role of roles) {
+            const demote = key !== 'all' && !wanted.includes(role.dataset.domain ?? '');
+            role.classList.toggle('demoted', demote);
+            // A collapsed role's disclosure must not stay open underneath the
+            // collapse — that leaves a stranded block of text with no visible
+            // heading attached to it.
+            if (demote) {
+              for (const open of role.querySelectorAll('details[open]')) {
+                open.removeAttribute('open');
+              }
+            }
+          }
+
+          for (const other of buttons) {
+            other.setAttribute('aria-pressed', String(other === button));
+          }
+
+          if (blurb) {
+            // The copy is authored in site.ts and reaches here through a data
+            // attribute, so there is no second copy of the strings in script.
+            const text = button.dataset.blurbText ?? '';
+            blurb.textContent = text;
+            blurb.hidden = !text;
+          }
+        });
+      }
+    }
+  }
+
+  customElements.define('resume-lens', ResumeLens);
+</script>
+
+<style>
+  .head {
+    padding-block: clamp(3rem, 8vw, 5rem) var(--space-lg);
+    border-block-end: 1px solid var(--rule);
+  }
+
+  h1 {
+    margin-block-start: var(--space-sm);
+    font-size: var(--step-3);
+  }
+
+  .line {
+    max-width: 38rem;
+    margin-block-start: var(--space-md);
+    font-size: var(--step-1);
+    font-weight: 300;
+    line-height: 1.45;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-md);
+    margin-block-start: var(--space-lg);
+  }
+
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--grad-cta);
+    color: var(--on-cta);
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    padding: 0.85rem 1.4rem;
+    border-radius: 4px;
+    box-shadow: var(--glow-soft);
+    background-size: 190% 100%;
+    background-position: 0% 50%;
+    transition:
+      background-position 0.45s ease,
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .cta:hover {
+    background-position: 100% 50%;
+    box-shadow: var(--glow-lift);
+    transform: translateY(-2px);
+  }
+
+  .arrow {
+    transition: transform 0.2s ease;
+  }
+
+  .cta:hover .arrow {
+    transform: translateX(3px);
+  }
+
+  .plain {
+    color: var(--muted);
+    text-decoration-color: var(--rule-strong);
+  }
+
+  .plain:hover {
+    color: var(--signal);
+  }
+
+  /* ---- sticky section nav ---- */
+
+  .jump {
+    position: sticky;
+    /* Clears the site header, which is itself sticky and 3.25rem tall. */
+    inset-block-start: 3.25rem;
+    z-index: 5;
+    /* Bleeds to the viewport edge so the blurred bar spans the full width,
+       while its contents stay on the shell's inset. */
+    margin-inline: calc(clamp(1.25rem, 5vw, 3rem) * -1);
+    padding-inline: clamp(1.25rem, 5vw, 3rem);
+    background: color-mix(in srgb, var(--paper) 90%, transparent);
+    backdrop-filter: saturate(1.4) blur(8px);
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .jump ul {
+    display: flex;
+    gap: 0.35rem;
+    list-style: none;
+    margin: 0;
+    padding-block: 0.5rem;
+    /* Long enough to overflow on a phone. Scrolling beats wrapping to a second
+       row, which would double the height of a sticky element. */
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .jump ul::-webkit-scrollbar {
+    display: none;
+  }
+
+  .jump a {
+    display: block;
+    padding: 0.3rem 0.7rem;
+    color: var(--muted);
+    text-decoration: none;
+    white-space: nowrap;
+    border-radius: 999px;
+    transition:
+      color 0.15s ease,
+      background 0.15s ease;
+  }
+
+  .jump a:hover {
+    color: var(--ink);
+    background: var(--signal-wash);
+  }
+
+  /* ---- lens control ---- */
+
+  .lens {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-block-start: var(--space-md);
+  }
+
+  .lens-btn {
+    padding: 0.42rem 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    cursor: pointer;
+    transition:
+      color 0.16s ease,
+      background 0.16s ease,
+      border-color 0.16s ease,
+      box-shadow 0.16s ease;
+  }
+
+  .lens-btn:hover {
+    color: var(--ink);
+    border-color: var(--rule-strong);
+  }
+
+  .lens-btn[aria-pressed='true'] {
+    color: var(--on-cta);
+    background: var(--grad-cta);
+    border-color: transparent;
+    box-shadow: var(--glow-soft);
+  }
+
+  .lens-blurb {
+    max-inline-size: 44rem;
+    margin-block-start: var(--space-md);
+    padding-inline-start: 0.85rem;
+    /* border-image paints the gradient into the border box; the width and style
+       still have to be declared for there to be a box to paint into. */
+    border-inline-start: 2px solid transparent;
+    border-image: var(--grad-edge) 1;
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  /* ---- roles ---- */
+
+  .roles {
+    list-style: none;
+    margin: 0;
+  }
+
+  .role {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-xs) var(--space-md);
+    padding-block: clamp(1.75rem, 4vw, 2.5rem);
+    border-block-end: 1px solid var(--rule);
+    transition:
+      opacity 0.25s ease,
+      padding-block 0.25s ease;
+  }
+
+  .dates {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    padding-block-start: 0.3em;
+  }
+
+  h3 {
+    font-family: var(--font-display);
+    font-size: var(--step-1);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  /* Per-domain, so the company line is colour-keyed to the same legend the
+     career trace uses directly above it. */
+  .org {
+    margin-block-start: 0.3rem;
+    color: var(--c, var(--signal));
+  }
+
+  .role-note {
+    margin-block-start: 0.3rem;
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+
+  .highlights {
+    margin-block-start: var(--space-sm);
+    padding-inline-start: 0;
+    list-style: none;
+    max-width: 54ch;
+  }
+
+  .highlights li {
+    position: relative;
+    padding-inline-start: 1.1rem;
+    margin-block-end: 0.4rem;
+  }
+
+  .highlights li::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 0.72em;
+    inset-inline-start: 0;
+    inline-size: 0.45rem;
+    block-size: 2px;
+    border-radius: 2px;
+    background: var(--c, var(--signal));
+  }
+
+  /* ---- demoted state ----
+
+     Detail is dropped, and the row collapses to something close to a single
+     ledger line. Without the padding and type-size reduction the "focused"
+     view is barely shorter than the full one, so the filter would cost the
+     reader a click and give nothing back. */
+
+  .role.demoted {
+    /* Cancelling the reveal animation is what makes the opacity below take
+       effect at all. A running CSS animation outranks every normal author
+       declaration in the cascade, so the reveal's `opacity: 1` end keyframe was
+       silently overriding `.demoted`. Killing the animation is more honest than
+       `!important`, and a demoted row has no reveal worth playing anyway. */
+    animation: none;
+    padding-block: 0.7rem;
+    opacity: 0.55;
+  }
+
+  .role.demoted:hover {
+    opacity: 1;
+  }
+
+  .role.demoted .detail,
+  .role.demoted .role-note {
+    display: none;
+  }
+
+  .role.demoted h3 {
+    font-size: var(--step-0);
+    font-weight: 500;
+  }
+
+  /* Dates and company sit on the title's baseline rather than stacking, so a
+     demoted role occupies one line on a wide screen. */
+  .role.demoted .dates {
+    padding-block-start: 0.15em;
+  }
+
+  .role.demoted .org {
+    margin-block-start: 0.15rem;
+    font-size: 0.72rem;
+  }
+
+  /* ---- disclosure ---- */
+
+  .more {
+    margin-block-start: var(--space-sm);
+    max-inline-size: 54ch;
+  }
+
+  summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.65rem;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    cursor: pointer;
+    list-style: none;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  /* Safari draws its own disclosure triangle without this. */
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary:hover {
+    color: var(--ink);
+    border-color: var(--rule-strong);
+  }
+
+  .chev {
+    font-size: 0.8em;
+    transition: transform 0.2s ease;
+  }
+
+  details[open] summary {
+    color: var(--ink);
+    border-color: color-mix(in oklch, var(--signal) 35%, var(--rule));
+  }
+
+  details[open] .chev {
+    transform: rotate(180deg);
+  }
+
+  .projects {
+    display: grid;
+    gap: var(--space-sm);
+    list-style: none;
+    margin: var(--space-sm) 0 0;
+  }
+
+  .projects li {
+    padding: 0.7rem 0.85rem;
+    background: var(--grad-surface);
+    border: 1px solid var(--rule);
+    border-inline-start: 2px solid var(--c, var(--signal));
+    border-radius: 4px;
+  }
+
+  .proj-name {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .proj-summary {
+    margin-block-start: 0.3rem;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.28rem;
+    list-style: none;
+    margin: var(--space-sm) 0 0;
+  }
+
+  .chips li {
+    padding: 0.2rem 0.48rem;
+    font-size: 0.68rem;
+    color: var(--ink);
+    background: var(--signal-wash);
+    border-radius: 3px;
+  }
+
+  /* ---- blocks ---- */
+
+  .empty {
+    padding-block: var(--space-lg);
+    max-width: 38rem;
+  }
+
+  .empty p:first-child {
+    color: var(--muted);
+    margin-block-end: var(--space-sm);
+  }
+
+  .empty code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--signal-wash);
+    padding: 0.1em 0.35em;
+  }
+
+  .block {
+    padding-block: clamp(2rem, 5vw, 3rem);
+    border-block-end: 1px solid var(--rule);
+    /* Offsets the two stacked sticky bars so an anchor jump doesn't land the
+       heading underneath them. */
+    scroll-margin-block-start: 6rem;
+  }
+
+  .block:last-child {
+    border-block-end: 0;
+  }
+
+  .pairs {
+    margin-block-start: var(--space-md);
+  }
+
+  .note {
+    margin-block-start: 0.35rem;
+    color: var(--muted);
+  }
+
+  .plot-wrap {
+    margin-block-start: var(--space-md);
+  }
+
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.15rem var(--space-md);
+    padding-block: var(--space-sm);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .pair dt {
+    color: var(--muted);
+  }
+
+  .pair dd {
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  /* Inline by default in the markup; forced onto its own line so the
+     institution reads as a subordinate label, not part of the credential. */
+  .pair .org {
+    display: block;
+    margin-block-start: 0.2rem;
+    color: var(--signal);
+  }
+
+  /* An honest label rather than a strikethrough. Struck-through text is
+     announced as deleted by some screen readers and skipped entirely by
+     others; a word says the same thing to everyone. */
+  .lapsed {
+    display: inline-block;
+    margin-inline-start: 0.5rem;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--rule);
+    border-radius: 3px;
+    vertical-align: 0.1em;
+  }
+
+  /* ---- domain colours ----
+     Same keys as the career trace, so a role's colour is consistent between the
+     plot and its entry below. */
+  [data-domain='ai'] {
+    --c: var(--dom-ai);
+  }
+  [data-domain='telecom'] {
+    --c: var(--dom-telecom);
+  }
+  [data-domain='finance'] {
+    --c: var(--dom-finance);
+  }
+  [data-domain='commerce'] {
+    --c: var(--dom-commerce);
+  }
+  [data-domain='public'] {
+    --c: var(--dom-public);
+  }
+
+  @media (min-width: 45rem) {
+    .role,
+    .pair {
+      grid-template-columns: 11rem minmax(0, 1fr);
+      align-items: start;
+    }
+  }
+</style>

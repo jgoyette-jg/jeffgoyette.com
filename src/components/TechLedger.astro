@@ -1,0 +1,324 @@
+---
+/**
+ * Every technology named across the eleven roles, derived — never hand-typed.
+ *
+ * This is the component that makes a skills list falsifiable. A curated grid
+ * says "I know Kafka"; this says "Kafka appears in one role, starting 2022",
+ * computed from the same `stack` arrays that render on /resume. It cannot
+ * inflate, because the only way to add an entry is to add it to a role.
+ *
+ * Sorted by breadth first (how many roles) then by first year, so the
+ * technologies carried across a career surface above the ones used once.
+ */
+
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  roles: CollectionEntry<'roles'>[];
+}
+
+const { roles } = Astro.props;
+
+type Entry = {
+  name: string;
+  /** Roles the technology appears in. Breadth, not depth — say so in the UI. */
+  count: number;
+  /** Calendar year of the earliest role that names it. */
+  since: number;
+  /** Every domain it has been used in. Drives the multi-colour indicator. */
+  domains: string[];
+};
+
+const index = new Map<string, Entry>();
+
+for (const role of roles) {
+  const year = Number(role.data.start.trim().split(/\s+/)[1]);
+
+  for (const name of role.data.stack) {
+    const existing = index.get(name);
+
+    if (!existing) {
+      index.set(name, {
+        name,
+        count: 1,
+        since: year,
+        domains: [role.data.domain],
+      });
+      continue;
+    }
+
+    existing.count += 1;
+    existing.since = Math.min(existing.since, year);
+    if (!existing.domains.includes(role.data.domain)) {
+      existing.domains.push(role.data.domain);
+    }
+  }
+}
+
+const entries = [...index.values()].sort(
+  (a, b) => b.count - a.count || a.since - b.since || a.name.localeCompare(b.name)
+);
+
+/** Longest continuous presence, used for the intro line. */
+const oldest = Math.min(...entries.map((entry) => entry.since));
+const broadest = entries[0];
+---
+
+<tech-ledger data-total={entries.length}>
+  <p class="intro">
+    <strong>{entries.length}</strong> technologies named across {roles.length} roles,
+    counted from the résumé rather than recalled. The oldest entry dates to {oldest};
+    the most widely carried is <strong>{broadest?.name}</strong>, in {broadest?.count} of
+    them.
+  </p>
+
+  <div class="controls">
+    <div class="chips" role="group" aria-label="Filter by domain">
+      <button type="button" class="chip" data-domain="all" aria-pressed="true">All</button>
+      <button type="button" class="chip" data-domain="ai" aria-pressed="false">AI</button>
+      <button type="button" class="chip" data-domain="telecom" aria-pressed="false">
+        Telecom
+      </button>
+      <button type="button" class="chip" data-domain="finance" aria-pressed="false">
+        Banking
+      </button>
+      <button type="button" class="chip" data-domain="commerce" aria-pressed="false">
+        Commerce
+      </button>
+      <button type="button" class="chip" data-domain="public" aria-pressed="false">
+        Public / teaching
+      </button>
+    </div>
+    <p class="count mono" role="status" aria-live="polite">
+      <span data-shown={entries.length}>{entries.length}</span> shown
+    </p>
+  </div>
+
+  <ul class="ledger">
+    {
+      entries.map((entry, i) => (
+        <li
+          class="tech"
+          data-domains={entry.domains.join(' ')}
+          data-count={entry.count}
+          style={`--i: ${i}; --w: ${(entry.count / (broadest?.count ?? 1)) * 100}%`}
+        >
+          <span class="bar" aria-hidden="true"></span>
+          <span class="name">{entry.name}</span>
+          <span class="meta mono">
+            <span class="since">{entry.since}</span>
+            <span class="roles">
+              {entry.count}
+              {entry.count === 1 ? ' role' : ' roles'}
+            </span>
+          </span>
+          <span class="dots" aria-hidden="true">
+            {entry.domains.map((domain) => (
+              <i data-domain={domain}></i>
+            ))}
+          </span>
+        </li>
+      ))
+    }
+  </ul>
+</tech-ledger>
+
+<script>
+  class TechLedger extends HTMLElement {
+    connectedCallback() {
+      const chips = [...this.querySelectorAll<HTMLButtonElement>('.chip')];
+      const rows = [...this.querySelectorAll<HTMLElement>('.tech')];
+      const shown = this.querySelector<HTMLElement>('[data-shown]');
+
+      for (const chip of chips) {
+        chip.addEventListener('click', () => {
+          const want = chip.dataset.domain ?? 'all';
+          let visible = 0;
+
+          for (const row of rows) {
+            // A technology can belong to several domains, so this is a
+            // membership test on a space-separated list rather than equality.
+            const domains = (row.dataset.domains ?? '').split(' ');
+            const keep = want === 'all' || domains.includes(want);
+            row.hidden = !keep;
+            if (keep) visible += 1;
+          }
+
+          for (const other of chips) {
+            other.setAttribute('aria-pressed', String(other === chip));
+          }
+          if (shown) shown.textContent = String(visible);
+        });
+      }
+    }
+  }
+
+  customElements.define('tech-ledger', TechLedger);
+</script>
+
+<style>
+  .intro {
+    max-inline-size: 44rem;
+    margin-block-end: var(--space-md);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .intro strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm) var(--space-md);
+    padding-block-end: var(--space-md);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .chip {
+    padding: 0.36rem 0.72rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    cursor: pointer;
+    transition:
+      color 0.16s ease,
+      background 0.16s ease,
+      border-color 0.16s ease;
+  }
+
+  .chip:hover {
+    color: var(--ink);
+    border-color: var(--rule-strong);
+  }
+
+  .chip[aria-pressed='true'] {
+    color: var(--on-cta);
+    background: var(--grad-cta);
+    border-color: transparent;
+  }
+
+  .count {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    margin-inline-start: auto;
+  }
+
+  .ledger {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+    gap: 1px;
+    list-style: none;
+    margin: 0;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+
+  .tech {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    gap: 0.15rem 0.6rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--card);
+    isolation: isolate;
+    transition: background 0.16s ease;
+  }
+
+  .tech:hover {
+    background: var(--signal-wash);
+  }
+
+  /* The bar is the count, drawn to scale behind the label rather than beside
+     it — so the whole grid reads as a histogram at a glance without spending a
+     column on it. */
+  .bar {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inline-size: var(--w);
+    z-index: -1;
+    background: var(--grad-edge);
+    opacity: 0.16;
+    transform-origin: left center;
+    animation: grow-bar 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+    /* Capped so the last rows in a long ledger aren't still waiting to draw
+       ten seconds after the section is in view. */
+    animation-delay: calc(min(var(--i), 40) * 18ms);
+  }
+
+  @keyframes grow-bar {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  .name {
+    grid-column: 1;
+    font-size: 0.86rem;
+    line-height: 1.3;
+  }
+
+  .meta {
+    grid-column: 1;
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.66rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dots {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: flex;
+    align-self: center;
+    gap: 2px;
+  }
+
+  .dots i {
+    inline-size: 5px;
+    block-size: 5px;
+    border-radius: 50%;
+    background: var(--c);
+  }
+
+  [data-domain='ai'] {
+    --c: var(--dom-ai);
+  }
+  [data-domain='telecom'] {
+    --c: var(--dom-telecom);
+  }
+  [data-domain='finance'] {
+    --c: var(--dom-finance);
+  }
+  [data-domain='commerce'] {
+    --c: var(--dom-commerce);
+  }
+  [data-domain='public'] {
+    --c: var(--dom-public);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bar {
+      animation: none;
+    }
+  }
+</style>

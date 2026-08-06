@@ -1,0 +1,67 @@
+---
+import { site, profiles } from '../data/site';
+
+const year = new Date().getFullYear();
+---
+
+<footer>
+  <div class="shell inner">
+    <p class="mono">&copy; {year} {site.name}</p>
+
+    <ul class="links">
+      <li>
+        <a href={`mailto:${site.email}`} class="mono">{site.email}</a>
+      </li>
+      {
+        profiles.map((p) => (
+          <li>
+            <a href={p.href} class="mono" rel="me">
+              {p.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</footer>
+
+<style>
+  footer {
+    border-block-start: 1px solid var(--rule);
+    margin-block-start: var(--space-xl);
+    padding-block: var(--space-lg);
+  }
+
+  .inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-sm) var(--space-md);
+  }
+
+  p {
+    color: var(--muted);
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    list-style: none;
+    margin: 0;
+  }
+
+  /* Quiet by default — the footer shouldn't compete with the contact line
+     directly above it for the same click. */
+  .links a {
+    color: var(--muted);
+    text-decoration-color: var(--rule-strong);
+    transition: color 0.15s ease;
+  }
+
+  .links a:hover {
+    color: var(--signal);
+    text-decoration-color: currentColor;
+  }
+</style>

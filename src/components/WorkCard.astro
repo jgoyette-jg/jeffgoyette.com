@@ -1,0 +1,271 @@
+---
+/**
+ * A piece of work as a job record: identifier, title, summary, measurement,
+ * and the stack it ran on.
+ *
+ * `position` comes from the `rank` field — an explicit ordering by impact — so
+ * the numbering is information. The first card is given `feature`, which spans
+ * the grid and enlarges the type; that is also a claim, not a layout choice.
+ */
+
+interface Props {
+  position: number;
+  title: string;
+  summary: string;
+  href: string;
+  external?: boolean;
+  period: string;
+  role?: string;
+  stack?: string[];
+  metric?: { value: string; label: string; positive: boolean };
+  feature?: boolean;
+  index?: number;
+}
+
+const {
+  position,
+  title,
+  summary,
+  href,
+  external = false,
+  period,
+  role,
+  stack = [],
+  metric,
+  feature = false,
+  index = 0,
+} = Astro.props;
+
+const pad = String(position).padStart(2, '0');
+---
+
+<li
+  class:list={['card', 'reveal', 'spotlight', { feature }]}
+  style={`--i: ${index}`}
+>
+  <span class="rail" aria-hidden="true"></span>
+
+  <div class="top">
+    <span class="pos" aria-hidden="true">{pad}</span>
+    {
+      metric ? (
+        <div class="metric">
+          <span class="value" data-positive={metric.positive}>
+            {metric.value}
+          </span>
+          <span class="label mono">{metric.label}</span>
+        </div>
+      ) : role ? (
+        <span class="role mono">{role}</span>
+      ) : null
+    }
+  </div>
+
+  <h3>
+    <a
+      href={href}
+      {...external ? { target: '_blank', rel: 'noopener noreferrer' } : {}}
+    >
+      {title}
+      {external ? <span class="ext" aria-hidden="true">&#8599;</span> : null}
+    </a>
+  </h3>
+
+  <p class="summary">{summary}</p>
+
+  <p class="meta mono">
+    <span class="period">{period}</span>
+    {stack.length ? <span class="stack">{stack.join('  ·  ')}</span> : null}
+  </p>
+</li>
+
+<style>
+  .card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: clamp(1.25rem, 2.5vw, 1.75rem);
+    background: var(--grad-surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    /* Clips the rail and the spotlight to the rounded corner. Also creates a
+       containing block, which is what keeps the ::before spotlight from
+       escaping to the nearest positioned ancestor. */
+    overflow: hidden;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .card:hover,
+  .card:focus-within {
+    border-color: color-mix(in oklch, var(--signal) 40%, var(--rule));
+    box-shadow: var(--glow-lift);
+    transform: translateY(-3px);
+  }
+
+  /* The accent sweeps in from the left on hover — a span filling, matching the
+     draw direction of the career trace above it. */
+  .rail {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: 0;
+    block-size: 2px;
+    background: var(--grad-signal);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  .card:hover .rail,
+  .card:focus-within .rail {
+    transform: scaleX(1);
+  }
+
+  .top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-md);
+    min-block-size: 1.5rem;
+  }
+
+  /* The rank is set large and low-contrast rather than as a small mono label.
+     It is the ordering claim, so it should be the first thing the eye lands on
+     in the card — but it must not outweigh the title, hence the opacity. */
+  .pos {
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+    font-weight: 700;
+    line-height: 0.8;
+    letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+    color: var(--rule-strong);
+    transition:
+      opacity 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .card:hover .pos,
+  .card:focus-within .pos {
+    color: transparent;
+    background: var(--grad-signal);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  .role {
+    color: var(--muted);
+    text-align: end;
+  }
+
+  .metric {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    text-align: end;
+  }
+
+  .value {
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--signal);
+    background: var(--grad-signal);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* A genuine positive delta keeps the flat green. The gradient is for
+     measurements in general; the green is a specific claim about direction,
+     and running it through a violet-to-cyan ramp would destroy that. */
+  .value[data-positive='true'] {
+    color: var(--gain);
+    background: none;
+    -webkit-text-fill-color: var(--gain);
+  }
+
+  .metric .label {
+    color: var(--muted);
+    max-inline-size: 17ch;
+    line-height: 1.3;
+  }
+
+  h3 {
+    font-size: var(--step-1);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    margin-block-start: 0.15rem;
+  }
+
+  .feature h3 {
+    font-size: var(--step-2);
+  }
+
+  h3 a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Whole card is the target; the accessible name stays just the title. */
+  h3 a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  .card:hover h3 a {
+    text-decoration: underline;
+    text-decoration-color: var(--signal);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.14em;
+  }
+
+  .ext {
+    display: inline-block;
+    font-size: 0.6em;
+    vertical-align: 0.4em;
+    color: var(--muted);
+  }
+
+  .summary {
+    max-inline-size: 48ch;
+    color: var(--ink);
+  }
+
+  .feature .summary {
+    font-size: var(--step-1);
+    font-weight: 300;
+    line-height: 1.45;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.9rem;
+    margin-block-start: auto;
+    padding-block-start: 0.75rem;
+    color: var(--muted);
+  }
+
+  .period {
+    color: var(--ink);
+  }
+
+  @media (min-width: 52rem) {
+    .feature {
+      grid-column: 1 / -1;
+    }
+
+    .feature .top {
+      min-block-size: 2rem;
+    }
+  }
+</style>

@@ -1,0 +1,163 @@
+---
+/**
+ * The headline numbers, as a grid that counts up when it scrolls into view.
+ *
+ * The final value is rendered into the HTML, not written by the script. That
+ * ordering matters: with JS disabled, blocked, or still parsing, the correct
+ * number is already on the page and the count-up is a decoration applied to
+ * text that was always right. The inverse — empty spans filled in by script —
+ * ships a page whose content depends on a network request.
+ */
+
+interface Stat {
+  /** The number itself, as a number so the count-up has something to ramp to. */
+  value: number;
+  /** Rendered before the digits, e.g. '$'. */
+  prefix?: string;
+  /** Rendered after the digits, e.g. '+', 'k', '/s'. */
+  suffix?: string;
+  /** What it measures. One line, no adjectives. */
+  label: string;
+  /** Longer gloss shown underneath on wider screens. */
+  note?: string;
+}
+
+interface Props {
+  stats: Stat[];
+}
+
+const { stats } = Astro.props;
+---
+
+<dl class="wall">
+  {
+    stats.map((stat, i) => (
+      <div class="cell reveal spotlight" style={`--i: ${i}`}>
+        <dt class="figure">
+          {stat.prefix ? <span class="affix">{stat.prefix}</span> : null}
+          <span class="digits grad-text" data-count={stat.value}>
+            {stat.value}
+          </span>
+          {stat.suffix ? <span class="affix">{stat.suffix}</span> : null}
+        </dt>
+        <dd>
+          <span class="label mono">{stat.label}</span>
+          {stat.note ? <span class="note">{stat.note}</span> : null}
+        </dd>
+      </div>
+    ))
+  }
+</dl>
+
+<script>
+  /**
+   * Count up each figure once, when it first enters view.
+   *
+   * `unobserve` on first intersection is deliberate — a counter that re-runs
+   * every time you scroll past reads as a broken widget rather than a flourish.
+   */
+  const digits = document.querySelectorAll<HTMLElement>('.digits[data-count]');
+
+  if (digits.length && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const DURATION = 1100;
+
+    const run = (el: HTMLElement) => {
+      const target = Number(el.dataset.count);
+      if (!Number.isFinite(target)) return;
+
+      const started = performance.now();
+
+      const tick = (now: number) => {
+        const t = Math.min((now - started) / DURATION, 1);
+        // Cubic ease-out. A linear ramp on a number reads mechanical; easing
+        // out makes it land rather than stop.
+        const eased = 1 - Math.pow(1 - t, 3);
+        el.textContent = String(Math.round(target * eased));
+        if (t < 1) requestAnimationFrame(tick);
+        else el.textContent = String(target); // exact, not the rounded ease
+      };
+
+      requestAnimationFrame(tick);
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          observer.unobserve(entry.target);
+          run(entry.target as HTMLElement);
+        }
+      },
+      { threshold: 0.6 }
+    );
+
+    for (const el of digits) observer.observe(el);
+  }
+</script>
+
+<style>
+  .wall {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 1px;
+    margin: 0;
+    /* The gap is 1px and the background shows through it, so the grid draws its
+       own rules — no borders to get double-thick where cells meet. */
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: clamp(1.1rem, 3vw, 1.7rem);
+    background: var(--grad-surface);
+    transition: background 0.25s ease;
+  }
+
+  .figure {
+    display: flex;
+    align-items: baseline;
+    gap: 0.05em;
+    font-family: var(--font-display);
+    font-size: var(--step-3);
+    font-weight: 600;
+    line-height: 0.9;
+    letter-spacing: -0.045em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Tabular figures keep the box from resizing as the digits tick, which would
+     otherwise nudge the label sideways forty times a second. */
+  .digits {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .affix {
+    font-size: 0.5em;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0;
+  }
+
+  dd {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .label {
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .note {
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--muted);
+  }
+</style>

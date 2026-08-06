@@ -1,0 +1,584 @@
+/* ------------------------------------------------------------------
+   Design tokens — "lit instrument panel"
+
+   Cold paper, graphite ink, and an electric violet that now carries the
+   gradient system as well as the links. The green is still reserved
+   exclusively for real positive deltas; never use it as decoration.
+
+   Every gradient interpolates `in oklch`. In sRGB a violet-to-cyan ramp
+   passes through a desaturated grey at the midpoint; in OKLCH it stays
+   chromatic the whole way across. Worth the extra six characters.
+   ------------------------------------------------------------------ */
+
+/* Registered so it can be interpolated. An unregistered custom property is
+   a string to the animation engine, so `--angle: 0deg -> 360deg` simply
+   snaps at 50%. Typing it is what makes the conic borders rotate. */
+@property --angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* Pointer position within a card, 0–1 on each axis. Registered as a number
+   so it eases between frames instead of stepping — the spotlight keeps
+   moving smoothly even when mousemove events arrive unevenly. */
+@property --mx {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0.5;
+}
+
+@property --my {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0.5;
+}
+
+:root {
+  color-scheme: light dark;
+
+  --paper: #f1f3f6;
+  --card: #ffffff;
+  --ink: #10131a;
+  --muted: #5c6473;
+  --rule: #dce1e9;
+  --rule-strong: #c3cbd8;
+  --signal: #4b24e0;
+  --signal-wash: rgba(75, 36, 224, 0.08);
+  --gain: #0e7c5a;
+
+  /* Domain palette — used only by the career trace, where colour encodes the
+     industry a role sat in. Five values because there are five domains in the
+     history; adding a sixth means the legend stops being readable at a glance.
+     Green is deliberately absent: it stays reserved for --gain. */
+  --dom-ai: #5b30e6;
+  --dom-telecom: #0e7f96;
+  --dom-finance: #a35a06;
+  --dom-commerce: #be2c5c;
+  --dom-public: #52607a;
+
+  /* Each domain gets a second stop so its span in the career trace can be a
+     ramp rather than a flat fill. The pair is always the same hue family —
+     the gradient adds depth without inventing a sixth colour that the legend
+     would then be lying about. */
+  --dom-ai-2: #a855f7;
+  --dom-telecom-2: #22d3ee;
+  --dom-finance-2: #f0a94a;
+  --dom-commerce-2: #f2709c;
+  --dom-public-2: #94a3b8;
+
+  /* ---- gradient system ----
+     Three ramps, used consistently: `--grad-signal` for anything that is a
+     claim (headline words, metrics, active states), `--grad-spectrum` for the
+     full-career sweep, `--grad-edge` for hairline borders and rules. */
+  --grad-signal: linear-gradient(
+    100deg in oklch,
+    var(--signal) 0%,
+    #7c4dff 45%,
+    #22d3ee 100%
+  );
+  --grad-spectrum: linear-gradient(
+    100deg in oklch,
+    var(--dom-public) 0%,
+    var(--dom-finance) 22%,
+    var(--dom-commerce) 45%,
+    var(--dom-telecom) 70%,
+    var(--dom-ai) 100%
+  );
+  --grad-edge: linear-gradient(
+    100deg in oklch,
+    color-mix(in oklch, var(--signal) 55%, transparent),
+    color-mix(in oklch, #22d3ee 45%, transparent)
+  );
+
+  /* Filled controls get their own ramp, and it is not `--grad-signal`.
+     A single text colour has to clear 4.5:1 against *every* stop it sits on,
+     and `--grad-signal` ends on a bright cyan that white text fails against —
+     which the hover slide walks straight into. Every stop here is held on the
+     dark side of the luminance midpoint so `--on-cta` works across the whole
+     sweep. The hue family is unchanged; only the lightness is constrained. */
+  --grad-cta: linear-gradient(100deg in oklch, #4b24e0 0%, #6d28d9 50%, #0e6b7f 100%);
+  --on-cta: #ffffff;
+
+  /* Surface wash for panels that need to read as lit rather than printed.
+     Kept very low-alpha: at higher values the body text on top of it loses
+     contrast, and every panel here carries body text. */
+  --grad-surface: linear-gradient(
+    160deg in oklch,
+    color-mix(in oklch, var(--signal) 7%, var(--card)),
+    var(--card) 55%,
+    color-mix(in oklch, #22d3ee 4%, var(--card))
+  );
+
+  /* Glows. The `-soft` variant is for resting state, `-lift` for hover. */
+  --glow-soft: 0 1px 2px rgba(16, 19, 26, 0.04), 0 8px 24px -12px rgba(75, 36, 224, 0.16);
+  --glow-lift: 0 2px 4px rgba(16, 19, 26, 0.06), 0 20px 44px -16px rgba(75, 36, 224, 0.32);
+
+  /* Grid rule colour for the blueprint backdrops. Separate from --rule so the
+     backdrop can be fainter than a real dividing line without weakening the
+     dividing lines themselves. */
+  --grid-line: rgba(75, 36, 224, 0.07);
+  --grid-size: 3.25rem;
+
+  /* --font-display / --font-body / --font-mono are NOT defined here. The
+     <Font> component in Base.astro emits them into :root with correctly
+     sized fallback stacks. Redefining them here would race that rule at
+     equal specificity and win or lose depending on load order. */
+
+  /* Fluid type scale. Ratio tightens on small screens so the hero never
+     overflows on a 320px viewport. */
+  --step--1: clamp(0.78rem, 0.76rem + 0.1vw, 0.84rem);
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.12rem);
+  --step-1: clamp(1.2rem, 1.1rem + 0.5vw, 1.5rem);
+  --step-2: clamp(1.5rem, 1.3rem + 1vw, 2.1rem);
+  --step-3: clamp(2rem, 1.5rem + 2.4vw, 3.4rem);
+  --step-4: clamp(2.6rem, 1.5rem + 5.4vw, 6rem);
+
+  --shell: 68rem;
+  --prose: 34rem;
+
+  --space-xs: 0.5rem;
+  --space-sm: 0.875rem;
+  --space-md: 1.5rem;
+  --space-lg: 3rem;
+  --space-xl: clamp(4rem, 9vw, 7.5rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0b0d12;
+    --card: #12151c;
+    --ink: #e9ecf2;
+    --muted: #8b93a3;
+    --rule: #232833;
+    --rule-strong: #333a48;
+    --signal: #9e86ff;
+    --signal-wash: rgba(158, 134, 255, 0.12);
+    --gain: #3fbf92;
+
+    --dom-ai: #a78bfa;
+    --dom-telecom: #38bdd8;
+    --dom-finance: #f0a94a;
+    --dom-commerce: #f2709c;
+    --dom-public: #8fa0bd;
+
+    --dom-ai-2: #e0c3fc;
+    --dom-telecom-2: #7ef0ff;
+    --dom-finance-2: #ffd28a;
+    --dom-commerce-2: #ffa8c5;
+    --dom-public-2: #c3cfe2;
+
+    /* On a near-black paper the same ramp needs more luminance at both ends or
+       it disappears into the background. */
+    --grad-signal: linear-gradient(
+      100deg in oklch,
+      var(--signal) 0%,
+      #bda4ff 45%,
+      #7ef0ff 100%
+    );
+    --grad-edge: linear-gradient(
+      100deg in oklch,
+      color-mix(in oklch, var(--signal) 70%, transparent),
+      color-mix(in oklch, #7ef0ff 55%, transparent)
+    );
+
+    /* Inverted: on dark paper the filled control is the light element, so every
+       stop is held above the midpoint and the label goes dark. Same rule as
+       light mode, applied the other way round. */
+    --grad-cta: linear-gradient(100deg in oklch, #9e86ff 0%, #c4b0ff 50%, #7ef0ff 100%);
+    --on-cta: #0b0d12;
+    --grad-surface: linear-gradient(
+      160deg in oklch,
+      color-mix(in oklch, var(--signal) 12%, var(--card)),
+      var(--card) 55%,
+      color-mix(in oklch, #7ef0ff 7%, var(--card))
+    );
+
+    /* Shadows barely register on dark surfaces, so the lift comes almost
+       entirely from the coloured spread rather than a black drop. */
+    --glow-soft: 0 0 0 1px rgba(158, 134, 255, 0.06), 0 10px 30px -14px rgba(158, 134, 255, 0.3);
+    --glow-lift: 0 0 0 1px rgba(158, 134, 255, 0.14), 0 24px 56px -18px rgba(158, 134, 255, 0.5);
+
+    --grid-line: rgba(158, 134, 255, 0.09);
+  }
+}
+
+/* ------------------------------------------------------------------
+   Base
+   ------------------------------------------------------------------ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/**
+ * The `hidden` attribute is implemented as `[hidden] { display: none }` in the
+ * user-agent stylesheet, which loses to *any* author `display` declaration —
+ * so `el.hidden = true` on a `display: flex` card does nothing at all. Every
+ * filter on this site toggles `hidden`, so the correction belongs here once
+ * rather than as a `.thing[hidden]` rule in each component.
+ *
+ * `!important` is load-bearing: without it a later `.card { display: flex }`
+ * with equal specificity still wins on source order.
+ */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  font-weight: 400;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--signal);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+ul,
+ol {
+  padding: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--signal);
+  color: var(--paper);
+}
+
+/* ------------------------------------------------------------------
+   Shared primitives
+   ------------------------------------------------------------------ */
+
+.shell {
+  width: 100%;
+  max-width: var(--shell);
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 5vw, 3rem);
+}
+
+.prose {
+  max-width: var(--prose);
+}
+
+/* Small mono label above a section. Reads as an instrument readout,
+   not a decorative eyebrow — it always names what follows. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: 0.01em;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.75rem 1rem;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+/* ------------------------------------------------------------------
+   Gradient utilities
+   ------------------------------------------------------------------ */
+
+/* Gradient text. `background-clip: text` needs a transparent fill, which
+   means the text has no colour at all if the background fails to paint —
+   so the colour is set first and only then overridden. A browser that
+   doesn't support the clip keeps readable violet text. */
+.grad-text {
+  color: var(--signal);
+  background: var(--grad-signal);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  /* Descenders get clipped without this, because the text box is exactly the
+     em box and the gradient paints only inside it. */
+  padding-block-end: 0.06em;
+}
+
+@supports not (background-clip: text) {
+  .grad-text {
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+/* A hairline that is a gradient rather than a colour. Uses a pseudo-element
+   because `border-image` and `border-radius` are mutually exclusive. */
+.grad-rule {
+  block-size: 1px;
+  border: 0;
+  background: var(--grad-edge);
+}
+
+/* Blueprint backdrop. Two repeating gradients rather than an SVG so it costs
+   nothing to download and scales with --grid-size at any breakpoint. The mask
+   fades it out before it reaches the section edge, which stops the grid from
+   reading as a hard-edged rectangle sitting on the page. */
+.blueprint {
+  position: relative;
+  isolation: isolate;
+}
+
+.blueprint::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 75%);
+  pointer-events: none;
+}
+
+/* Spotlight surface. The card sets --mx/--my from pointer position (see the
+   `spotlight` behaviour script) and this paints a soft highlight there. With
+   no script running the values stay at their 0.5 initial value, so the card
+   just carries a centred sheen — it never looks broken. */
+.spotlight {
+  position: relative;
+  isolation: isolate;
+}
+
+.spotlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  background: radial-gradient(
+    22rem circle at calc(var(--mx) * 100%) calc(var(--my) * 100%),
+    color-mix(in oklch, var(--signal) 16%, transparent),
+    transparent 65%
+  );
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.spotlight:hover::before,
+.spotlight:focus-within::before {
+  opacity: 1;
+}
+
+/* Rotating conic edge, for the one or two elements that should read as live.
+   Applied to a wrapper whose child sits on an opaque background — the child
+   masks the middle of the conic gradient, leaving a 1px lit rim. */
+.conic-edge {
+  position: relative;
+  background: conic-gradient(
+    from var(--angle),
+    transparent 0deg,
+    var(--signal) 70deg,
+    #22d3ee 130deg,
+    transparent 200deg,
+    transparent 360deg
+  );
+  animation: spin-angle 6s linear infinite;
+}
+
+@keyframes spin-angle {
+  to {
+    --angle: 360deg;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Scroll reveal
+
+   Progressive enhancement in the strict sense: the default state is fully
+   visible, and the hidden state is only applied when the browser can
+   animate it back. A browser without `animation-timeline` support — or a
+   reader with reduced motion on — sees the finished page immediately
+   rather than a blank one waiting for an observer that never fires.
+   ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: reveal-in linear both;
+      animation-timeline: view();
+      /* Starts when the element's top edge is 15% up from the viewport
+         bottom, finishes 35% further in. Tuned so a row is fully resolved
+         well before it reaches reading position. */
+      animation-range: entry 15% entry 50%;
+    }
+
+    @keyframes reveal-in {
+      from {
+        opacity: 0;
+        transform: translateY(1.25rem) scale(0.985);
+      }
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+  }
+}
+
+/* Scroll progress. Also scroll-driven, and also additive — with no support
+   the bar simply stays at zero width and is invisible, which is the correct
+   fallback for a purely decorative indicator. */
+.scroll-progress {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 20;
+  block-size: 2px;
+  background: var(--grad-signal);
+  transform-origin: left center;
+  transform: scaleX(0);
+  pointer-events: none;
+}
+
+@supports (animation-timeline: scroll(root)) {
+  .scroll-progress {
+    animation: progress-grow linear both;
+    animation-timeline: scroll(root);
+  }
+
+  @keyframes progress-grow {
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+/* Load-in stagger. The only motion on the page besides focus and hover;
+   rows resolve top-to-bottom the way a results list fills in. */
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translateY(0.6rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.settle {
+  animation: settle 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* Spans draw left-to-right, oldest first, the way a waterfall fills as trace
+   data arrives. scaleX keeps it on the compositor — animating `width` on
+   eleven bars at once drops frames on a low-end machine. */
+@keyframes draw-span {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* The pulse that travels the hero pipeline. Opacity is keyed rather than
+   animated at the ends so it fades in and out instead of popping. */
+@keyframes travel {
+  0% {
+    left: 0%;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* The blanket rule above collapses every animation to nothing, which for a
+     scroll-driven `reveal` would leave the element frozen at its opening
+     keyframe — invisible. These two are the exceptions that need an explicit
+     resting state rather than a cancelled animation. */
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .scroll-progress {
+    display: none;
+  }
+}

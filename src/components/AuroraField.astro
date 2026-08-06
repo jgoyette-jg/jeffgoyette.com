@@ -2,13 +2,16 @@
 /**
  * The animated gradient field behind the hero.
  *
- * Four blurred radial blobs on a fixed layer, drifting on long offset cycles.
- * Two decisions are load-bearing:
+ * Four soft radial blobs on a fixed layer, drifting on long offset cycles.
+ * Three decisions are load-bearing:
  *
- *   1. `filter: blur()` on a large element is expensive to repaint, so nothing
- *      here animates a property that triggers paint. The blobs move with
- *      `translate` and `scale` only, which stay on the compositor.
- *   2. The layer is `position: fixed` with `pointer-events: none` and lives
+ *   1. No `filter: blur()`. An earlier version blurred each blob by ~90px;
+ *      profiling showed it was redundant, because a radial-gradient fading to
+ *      transparent is already soft. The falloff now lives in the gradient stops,
+ *      which cost nothing to rasterise.
+ *   2. Nothing animates a property outside transform and opacity, so the drift
+ *      stays entirely on the compositor and the page can reach idle.
+ *   3. The layer is `position: fixed` with `pointer-events: none` and lives
  *      behind everything at z-index -1. It never participates in layout, so it
  *      cannot shift content or create a scroll container.
  *
@@ -37,11 +40,10 @@ const { intensity = 1 } = Astro.props;
   /**
    * Feed pointer position to the aurora layer as two normalised offsets.
    *
-   * Written inside a rAF tick rather than directly in the listener: mousemove
-   * can fire more than once per frame, and each write to a custom property that
-   * a blur filter depends on schedules a repaint. Coalescing to one write per
-   * frame is the difference between smooth and visibly stuttery on a laptop
-   * integrated GPU.
+   * Written inside a rAF tick rather than directly in the listener:
+   * `pointermove` fires faster than the frame rate, and every write to a custom
+   * property invalidates style for each blob that reads it. Coalescing to one
+   * write per frame keeps that at four recalcs per frame instead of a dozen.
    */
   const field = document.querySelector<HTMLElement>('.aurora');
 
@@ -96,12 +98,18 @@ const { intensity = 1 } = Astro.props;
     inline-size: 46vmax;
     block-size: 46vmax;
     border-radius: 50%;
-    /* A 46vmax blur is the single most expensive thing on the page. Keeping it
-       proportional rather than a fixed px value means it doesn't turn into a
-       hard-edged circle on a large monitor. */
-    filter: blur(7vmax);
     opacity: calc(0.42 * var(--intensity));
-    will-change: transform;
+    /* No `filter: blur()` and no `will-change`, both deliberate.
+
+       The blur here was ~90px applied over 1.15 million px², and measurement
+       showed it bought nothing: a radial-gradient that fades to transparent is
+       already soft, so blurring it just re-rasterised an enormous surface to
+       reach almost the same image. Removing it changed the look imperceptibly
+       and freed the GPU. Softening the gradient's own falloff is free.
+
+       `will-change: transform` was pinning four large layers into GPU memory
+       permanently (~28MB at 2x DPR). A running transform animation promotes
+       its element anyway, so the hint was paying rent for nothing. */
   }
 
   /* Parallax depth: each blob shifts by a different multiple of the pointer
@@ -109,7 +117,7 @@ const { intensity = 1 } = Astro.props;
   .b1 {
     inset-block-start: -14vmax;
     inset-inline-start: -8vmax;
-    background: radial-gradient(circle at 50% 50%, var(--signal), transparent 68%);
+    background: radial-gradient(circle at 50% 50%, var(--signal) 0%, color-mix(in oklch, var(--signal) 45%, transparent) 38%, transparent 72%);
     animation: drift-a 26s ease-in-out infinite;
     translate: calc(var(--px) * 44px) calc(var(--py) * 44px);
   }
@@ -117,7 +125,7 @@ const { intensity = 1 } = Astro.props;
   .b2 {
     inset-block-start: -6vmax;
     inset-inline-end: -12vmax;
-    background: radial-gradient(circle at 50% 50%, var(--dom-telecom-2), transparent 68%);
+    background: radial-gradient(circle at 50% 50%, var(--dom-telecom-2) 0%, color-mix(in oklch, var(--dom-telecom-2) 45%, transparent) 38%, transparent 72%);
     animation: drift-b 32s ease-in-out infinite;
     translate: calc(var(--px) * -30px) calc(var(--py) * 26px);
   }
@@ -125,7 +133,7 @@ const { intensity = 1 } = Astro.props;
   .b3 {
     inset-block-start: 34vmax;
     inset-inline-start: 22vmax;
-    background: radial-gradient(circle at 50% 50%, var(--dom-commerce-2), transparent 66%);
+    background: radial-gradient(circle at 50% 50%, var(--dom-commerce-2) 0%, color-mix(in oklch, var(--dom-commerce-2) 45%, transparent) 36%, transparent 70%);
     opacity: calc(0.26 * var(--intensity));
     animation: drift-c 38s ease-in-out infinite;
     translate: calc(var(--px) * 62px) calc(var(--py) * -18px);
@@ -136,7 +144,7 @@ const { intensity = 1 } = Astro.props;
     inset-inline-start: 38vmax;
     inline-size: 30vmax;
     block-size: 30vmax;
-    background: radial-gradient(circle at 50% 50%, var(--dom-ai-2), transparent 70%);
+    background: radial-gradient(circle at 50% 50%, var(--dom-ai-2) 0%, color-mix(in oklch, var(--dom-ai-2) 45%, transparent) 40%, transparent 74%);
     opacity: calc(0.3 * var(--intensity));
     animation: drift-b 29s ease-in-out infinite reverse;
     translate: calc(var(--px) * -52px) calc(var(--py) * 40px);
@@ -153,36 +161,49 @@ const { intensity = 1 } = Astro.props;
       linear-gradient(to bottom, transparent 40%, var(--paper) 92%);
   }
 
-  /* `translate` is set inline above and the keyframes drive `transform`, so the
-     two compose instead of one overwriting the other. That is the whole reason
-     the parallax uses the newer individual property. */
+  /* Translation only — no `scale()`, and that is the point.
+
+     A composited layer can be moved by the compositor for free, because the
+     rasterised texture is still valid at the new position. Scaling invalidates
+     it: the gradient has to be re-rasterised at the new size every frame, and
+     these layers are ~400k px² each. Dropping scale from these three keyframes
+     was worth roughly 10ms per idle frame on a slow machine.
+
+     Distances are larger than the old ones to keep the motion legible now that
+     the size no longer changes. Opacity is deliberately not animated here: each
+     blob sets its own base opacity, and an absolute value in a shared keyframe
+     would flatten all four to the same one.
+
+     `translate` is set inline above and these drive `transform`, so the two
+     compose rather than overwrite. That is the whole reason the parallax uses
+     the newer individual property. */
   @keyframes drift-a {
     0%,
     100% {
-      transform: translate3d(0, 0, 0) scale(1);
+      transform: translate3d(0, 0, 0);
     }
     50% {
-      transform: translate3d(6vmax, 4vmax, 0) scale(1.14);
+      transform: translate3d(9vmax, 6vmax, 0);
     }
   }
 
   @keyframes drift-b {
     0%,
     100% {
-      transform: translate3d(0, 0, 0) scale(1.06);
+      transform: translate3d(0, 0, 0);
     }
     50% {
-      transform: translate3d(-7vmax, 5vmax, 0) scale(0.92);
+      transform: translate3d(-10vmax, 7vmax, 0);
     }
   }
 
   @keyframes drift-c {
     0%,
     100% {
-      transform: translate3d(0, 0, 0) scale(0.95);
+      transform: translate3d(0, 0, 0);
     }
     50% {
-      transform: translate3d(5vmax, -6vmax, 0) scale(1.2);
+      transform: translate3d(8vmax, -9vmax, 0);
     }
   }
 

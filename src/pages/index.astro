@@ -286,16 +286,31 @@ const pipeline = [
       background: var(--grad-edge);
     }
 
+    /* Stretched across the whole wire and invisible itself — this element
+       exists only to be the thing `translateX(100%)` is a percentage of. The
+       dot is the ::after. Animating this instead of `left` keeps the whole
+       animation on the compositor. */
     .pulse {
       position: absolute;
       inset-block-start: -2px;
+      inset-inline-start: 0;
+      inline-size: 100%;
+      block-size: 6px;
+      animation: travel 4.5s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+    }
+
+    .pulse::after {
+      content: '';
+      position: absolute;
+      inset-block: 0;
+      inset-inline-start: 0;
       inline-size: 6px;
       block-size: 6px;
       margin-inline-start: -3px;
       border-radius: 50%;
       background: var(--signal);
+      /* Static, never animated — a moving box-shadow repaints every frame. */
       box-shadow: 0 0 10px 1px var(--signal);
-      animation: travel 4.5s cubic-bezier(0.6, 0, 0.4, 1) infinite;
     }
   }
 

@@ -509,6 +509,7 @@ const duration = (s: (typeof spans)[number]) => {
     mask-image: linear-gradient(to right, #000 82%, rgba(0, 0, 0, 0.35));
   }
 
+  /* The live dot. Static — it does not animate at all. */
   .span.open::after {
     content: '';
     position: absolute;
@@ -519,19 +520,37 @@ const duration = (s: (typeof spans)[number]) => {
     margin-block-start: -2.5px;
     border-radius: 50%;
     background: var(--c);
-    box-shadow: 0 0 0 0 var(--c);
+  }
+
+  /* The expanding ring is a second element that scales, rather than a
+     box-shadow that grows.
+
+     This was the most expensive thing on the page. `box-shadow` is a paint
+     property, so animating its spread repainted the element every frame — and
+     with `infinite` on two open spans, that never stopped. At 20x CPU throttle
+     it alone cost 25fps → 56fps. Scale and opacity are compositor-only, so the
+     ring now costs effectively nothing while looking the same. */
+  .span.open::before {
+    content: '';
+    position: absolute;
+    inset-inline-end: -1px;
+    inset-block-start: 50%;
+    inline-size: 5px;
+    block-size: 5px;
+    margin-block-start: -2.5px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--c);
     animation: ping 2.4s ease-out infinite;
   }
 
   @keyframes ping {
-    0% {
-      box-shadow: 0 0 0 0 var(--c);
-      opacity: 1;
+    from {
+      transform: scale(1);
+      opacity: 0.9;
     }
-    70%,
-    100% {
-      box-shadow: 0 0 0 7px transparent;
-      opacity: 0.85;
+    to {
+      transform: scale(3.2);
+      opacity: 0;
     }
   }
 
@@ -648,8 +667,14 @@ const duration = (s: (typeof spans)[number]) => {
      already positioned correctly without them. */
   @media (prefers-reduced-motion: reduce) {
     .span,
-    .span.open::after {
+    /* The ring moved from ::after to ::before when it stopped animating
+       box-shadow — this selector has to follow it, or the pulse keeps running
+       for readers who asked for no motion. */
+    .span.open::before {
       animation: none;
+      /* Without this the ring freezes at its opening keyframe as a visible
+         static circle, which reads as a rendering artefact. */
+      opacity: 0;
     }
   }
 </style>

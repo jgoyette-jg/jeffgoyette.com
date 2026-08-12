@@ -7,7 +7,9 @@ title: Pod Architect
 # file as a lead, never as authority.
 note: Digital pod for retail and e-commerce · Lowe's account
 start: 'Jun 2019'
-end: 'Jan 2021'
+# Dec, not Jan. Jeff confirms the two roles did not overlap, and Finzly starts
+# Jan 2021 on his own résumé — so an end of Jan 2021 double-counted a month.
+end: 'Dec 2020'
 location: Charlotte, NC
 order: 70
 domain: commerce

@@ -1,6 +1,8 @@
 ---
 company: Revature
-title: Training and Technology Specialist
+# Both current résumés say "Technology Instructor". The previous value came from
+# the LinkedIn PDF export, which is not authoritative.
+title: Technology Instructor
 note: J2EE technology specialist and instructor
 start: 'Dec 2014'
 end: 'Jun 2016'

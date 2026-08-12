@@ -54,9 +54,11 @@ export const nav = [
  * Profile links. Delete any you do not want; the footer renders whatever
  * survives. `handle` is what's shown, `href` is where it goes.
  *
- * The LinkedIn slug is `jeffrey-g-a3520410a` — verified against the profile
- * export. The `jeffrey-goyette-a3520410a` variant printed on both current
- * résumés 404s, which is worth fixing on the documents themselves.
+ * The LinkedIn slug is `jeffrey-g-a3520410a`, confirmed by Jeff directly — the
+ * one fact here that could not be checked any other way, since linkedin.com
+ * answers automated requests with HTTP 999 regardless of whether the profile
+ * exists. The `jeffrey-goyette-a3520410a` variant that both current résumés
+ * used to print has been corrected on the documents themselves.
  */
 export const profiles: { label: string; handle: string; href: string }[] = [
   {
@@ -244,10 +246,15 @@ export const certifications: {
   {
     credential: 'Professional Cloud Architect',
     institution: 'Google Cloud',
-    year: '',
+    // Google's professional certifications run two years, so a 2023 lapse puts
+    // the exam around 2021.
+    year: '2023',
     expired: true,
   },
   {
+    // Not expired, and deliberately unqualified. Microsoft's fundamentals tier
+    // does not lapse — only its role-based and specialty certifications need
+    // renewing — so this one stays current without a date.
     credential: 'Azure AI Fundamentals (AI-900)',
     institution: 'Microsoft',
     year: '',

@@ -222,7 +222,11 @@ const sections = [
               <dt class="mono">Certification</dt>
               <dd>
                 {item.credential}
-                {item.expired ? <span class="lapsed mono">lapsed</span> : null}
+                {item.expired ? (
+                  <span class="lapsed mono">
+                    {item.year ? `lapsed ${item.year}` : 'lapsed'}
+                  </span>
+                ) : null}
                 <span class="org mono">{item.institution}</span>
               </dd>
             </div>

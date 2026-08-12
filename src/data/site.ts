@@ -1,9 +1,19 @@
 /**
  * Single source of truth for identity, contact, and nav.
  *
- * Reconciled against the LinkedIn profile export in /resumes/Profile.pdf.
- * Where LinkedIn and a résumé disagree on a title, date, or location, LinkedIn
- * wins and the more descriptive version moves to the role's `note` field.
+ * Titles, dates, and locations were reconciled against the LinkedIn profile
+ * export in /resumes/Profile.pdf, with the more descriptive résumé wording
+ * moved to each role's `note` field.
+ *
+ * That export is NOT authoritative. It lists Cognizant as "Principal Engineer
+ * Full Stack"; the live profile says Pod Architect, and Jeff has never held a
+ * principal-engineer title at all. It also dates to roughly May 2026 — it shows
+ * Ytel at 3 years 5 months — so it is both stale and, in at least one row,
+ * simply wrong.
+ *
+ * Jeff is the authority. Anything the export contributed that he has not
+ * confirmed out loud should be treated as unverified, and linkedin.com returns
+ * HTTP 999 to automated requests, so re-checking it means a manual export.
  *
  * Three things LinkedIn does not carry, so the résumés are the only source:
  * the Reel Estate role, the 2014 FCC and USCIS contracts, and the self-directed
@@ -241,5 +251,39 @@ export const certifications: {
     credential: 'Azure AI Fundamentals (AI-900)',
     institution: 'Microsoft',
     year: '',
+  },
+  {
+    // Federally required to buy refrigerant or open a sealed system at all, so
+    // it is a licence to do the work rather than a course completion. The type
+    // is the scope: II covers high-pressure appliances, which is what a
+    // residential split system is — so it names the work actually done.
+    credential: 'Section 608 Type II Refrigerant Handling',
+    institution: 'U.S. EPA',
+    year: '',
+  },
+];
+
+/**
+ * Outside the day job. One entry only, and it earns the section: the HVAC
+ * repair is the site's own hero claim — build the system, then prove it works —
+ * carried out on something physical, with a dollar figure attached.
+ *
+ * Keep the bar there. An interest belongs here when it demonstrates something
+ * the employment history cannot; a list of things Jeff merely enjoys would be
+ * weaker than no section at all.
+ */
+export const interests: {
+  title: string;
+  /** The figure the story turns on. Same pattern as a work metric — the number
+   *  is the reason the anecdote is worth a reader's time. */
+  metric?: { value: string; label: string };
+  lede: string;
+  body: string;
+}[] = [
+  {
+    title: 'HVAC',
+    metric: { value: '$3,000', label: 'the quote that started it' },
+    lede: 'To repair a refrigerant leak that was plainly visible — a crack I could point at. I learned to do the work myself instead.',
+    body: 'It had formed at the filter drier, on the liquid line. I recovered the charge, rebrazed the joint under flowing nitrogen so the inside of the tubing could not scale, pulled a vacuum, and put the charge back in. It has run fine since. I hold the EPA Section 608 certification and own the equipment for a full system replacement, not just service — so the next quote is a decision rather than a surprise.',
   },
 ];

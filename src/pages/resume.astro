@@ -4,7 +4,7 @@ import Base from '../layouts/Base.astro';
 import CareerTrace from '../components/CareerTrace.astro';
 import TechLedger from '../components/TechLedger.astro';
 import StackGrid from '../components/StackGrid.astro';
-import { site, education, certifications, lenses } from '../data/site';
+import { site, education, certifications, lenses, interests } from '../data/site';
 
 const roles = (await getCollection('roles')).sort(
   (a, b) => b.data.order - a.data.order
@@ -25,6 +25,7 @@ const sections = [
   { id: 'ledger', label: 'Ledger' },
   { id: 'skills', label: 'Skills' },
   { id: 'credentials', label: 'Credentials' },
+  { id: 'outside', label: 'Outside' },
 ];
 ---
 
@@ -229,6 +230,33 @@ const sections = [
         }
       </dl>
     </section>
+
+    {
+      interests.length ? (
+        <section class="block" id="outside">
+          <h2 class="eyebrow">Outside work</h2>
+          <p class="mono note">The same habit, applied to something with refrigerant in it</p>
+
+          {interests.map((item) => (
+            <article class="interest">
+              <div class="fig">
+                <p class="tag mono">{item.title}</p>
+                {item.metric ? (
+                  <>
+                    <p class="num grad-text">{item.metric.value}</p>
+                    <p class="cap mono">{item.metric.label}</p>
+                  </>
+                ) : null}
+              </div>
+              <div class="say">
+                <p class="lede">{item.lede}</p>
+                <p>{item.body}</p>
+              </div>
+            </article>
+          ))}
+        </section>
+      ) : null
+    }
   </div>
 </Base>
 
@@ -742,6 +770,66 @@ const sections = [
     vertical-align: 0.1em;
   }
 
+  /* ---- outside work ---- */
+
+  .interest {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-sm) var(--space-md);
+    margin-block-start: var(--space-md);
+    padding: var(--space-md);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--grad-surface);
+    overflow: hidden;
+  }
+
+  /* A gradient hairline along the top edge instead of the .blueprint grid.
+     The grid overlay paints at z-index -1, so it would disappear behind this
+     card's own background — a border is the treatment that survives a fill. */
+  .interest::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: 0;
+    block-size: 2px;
+    background: var(--grad-signal);
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    font-size: var(--step--1);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--signal);
+    background: var(--signal-wash);
+    border-radius: 4px;
+  }
+
+  .num {
+    margin-block-start: var(--space-sm);
+    font-size: var(--step-2);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .cap {
+    margin-block-start: 0.3rem;
+    font-size: var(--step--1);
+    color: var(--muted);
+  }
+
+  .say > p + p {
+    margin-block-start: var(--space-sm);
+  }
+
+  .lede {
+    font-size: var(--step-1);
+    line-height: 1.4;
+  }
+
   /* ---- domain colours ----
      Same keys as the career trace, so a role's colour is consistent between the
      plot and its entry below. */
@@ -763,7 +851,8 @@ const sections = [
 
   @media (min-width: 45rem) {
     .role,
-    .pair {
+    .pair,
+    .interest {
       grid-template-columns: 11rem minmax(0, 1fr);
       align-items: start;
     }

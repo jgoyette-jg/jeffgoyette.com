@@ -56,11 +56,14 @@ const roles = defineCollection({
     end: z.string().optional(),
     location: z.string().optional(),
     /**
-     * The internal or project-level title, when it differs from the one on
-     * LinkedIn. LinkedIn is the source of truth for `title`; this field keeps
-     * the more descriptive version without contradicting it.
-     *   title: 'Principal Engineer Full Stack'
-     *   note:  'Pod architect on the Lowe\'s account'
+     * Context that identifies the engagement, or the other name the same job
+     * went by — the division, the account, the scope of a management remit:
+     *   title: 'Senior Software Engineer & Technical Manager'
+     *   note:  'Technical manager of Professional Services and DevOps'
+     *
+     * Use it whenever two records name the same job differently, so the site
+     * and the profile can't read as two different jobs. It is not for parking
+     * a title nobody actually held — a wrong title belongs deleted, not noted.
      */
     note: z.string().optional(),
     /** Sort key, descending. Highest number is the most recent role. */

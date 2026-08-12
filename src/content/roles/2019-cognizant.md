@@ -1,7 +1,11 @@
 ---
 company: Cognizant
-title: Principal Engineer Full Stack
-note: Pod architect on the Lowe's digital pod
+title: Pod Architect
+# Matches the live LinkedIn profile and both current résumés. The PDF export in
+# /resumes disagrees, but Jeff confirms he never held a principal-engineer
+# title anywhere — so the export is wrong, not merely out of date. Treat that
+# file as a lead, never as authority.
+note: Digital pod for retail and e-commerce · Lowe's account
 start: 'Jun 2019'
 end: 'Jan 2021'
 location: Charlotte, NC

@@ -1,6 +1,10 @@
 ---
 company: Allstate
-title: Sr. Fullstack Software Developer
+# Not senior here — Jeff confirms he made senior later. Both the older résumé
+# ("Sr. Fullstack Software Engineer") and the LinkedIn export ("Sr. Fullstack
+# Software Developer") carry a "Sr." he did not hold at the time; he overrode
+# both. Those two documents still need correcting at the source.
+title: Fullstack Software Engineer
 note: Roadside Services
 start: 'Jun 2018'
 end: 'Jun 2019'

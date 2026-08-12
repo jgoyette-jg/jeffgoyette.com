@@ -1,7 +1,9 @@
 ---
 company: Finzly
-title: Senior Software Engineer
-note: Technical manager, DevOps · Professional Services
+# Two hats, held concurrently — the engineering title and the management one.
+# The LinkedIn export lists only the first; Jeff confirms both.
+title: Senior Software Engineer & Technical Manager
+note: Technical manager of Professional Services and DevOps
 start: 'Jan 2021'
 end: 'Jun 2022'
 location: Charlotte, NC
